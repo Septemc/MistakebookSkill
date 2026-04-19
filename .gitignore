@@ -1,0 +1,16 @@
+# Local reference repository, not part of the distributable project
+reference_code/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Local runtime outputs that may be created while testing the skill
+.mistakebook/
+.claude/
+.vscode/mistakebook/
+.codex/mistakebook/
+
+# OS junk
+.DS_Store
+Thumbs.db

@@ -1,0 +1,20 @@
+{
+  "name": "mistakebook",
+  "version": "1.0.0",
+  "description": "Mistakebook Skill for agents. Detects user correction mode, enters a correction loop with explicit completion confirmation, escalates into Ascended Mode after repeated failed corrections or manual trigger, archives detailed mistake cases into project/global stores, and refreshes distilled memory for future reuse.",
+  "author": {
+    "name": "Septemc"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mistakebook",
+    "correction-loop",
+    "ascended-mode",
+    "agent-memory",
+    "project-memory",
+    "global-memory",
+    "codex",
+    "claude",
+    "vscode"
+  ]
+}

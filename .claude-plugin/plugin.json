@@ -1,0 +1,17 @@
+{
+  "name": "mistakebook",
+  "version": "1.0.0",
+  "description": "Detects correction scenarios, keeps the agent in an explicit correction loop until the user confirms completion, escalates into Ascended Mode after repeated failed corrections or manual trigger, then archives detailed cases into project/global mistakebooks and refreshes distilled memory.",
+  "author": {
+    "name": "Septemc"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mistakebook",
+    "correction",
+    "ascended",
+    "memory",
+    "archive",
+    "claude"
+  ]
+}
