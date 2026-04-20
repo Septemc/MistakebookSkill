@@ -2,7 +2,7 @@
 
 错题集.Skill。我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了！ / I have done tens of thousands of practice problems, and I have summarized a vast amount of wrong answers. Now, I am invincible.
 
-![[]()](docs\assets\825b6024898386ec7ccef3496b3efe26.jpg)
+![](docs/assets/825b6024898386ec7ccef3496b3efe26.jpg)
 
 目标是把用户纠错过程进行沉淀：
 
