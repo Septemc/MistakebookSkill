@@ -1,8 +1,10 @@
 # Mistakebook Skill
 
-错题集.Skill。我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了。 / I have done tens of thousands of practice problems, and I have summarized a vast amount of wrong answers. Now, I am invincible.
+错题集.Skill。我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了！ / I have done tens of thousands of practice problems, and I have summarized a vast amount of wrong answers. Now, I am invincible.
 
-目标不是简单记录“这次答错了”，而是把一次真实的用户纠错过程沉淀成：
+![[]()](docs\assets\825b6024898386ec7ccef3496b3efe26.jpg)
+
+目标是把用户纠错过程进行沉淀：
 
 1. 可归档的详细案例
 2. 可复用的项目级经验
@@ -10,7 +12,7 @@
 4. 未来可再次回注给 Agent 的精炼记忆
 5. 在多次纠错仍失败时自动升级的 Ascended 神级模式
 
-这个仓库已经实现了一个可以继续迭代的真实项目骨架，而不是单独一份 Prompt：
+仓库主要内容如下：
 
 1. 通用核心 Skill
 2. Codex 适配
