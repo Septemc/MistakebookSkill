@@ -97,7 +97,7 @@ MistakebookSkill/
    - 提供 `/mistakebook` 与 `/ascended` 这类显式入口。
 4. 自动触发层
    - `hooks/`
-   - 让 Claude 风格宿主在用户输入时自动识别纠错状态、自动升级神级模式、自动恢复上下文。
+   - 让 Claude 风格宿主在用户输入时自动识别纠错状态、自动升级飞升模式、自动恢复上下文。
 5. 落盘与归档层
    - `scripts/mistakebook_cli.py`
    - 负责初始化项目级/全局级错题目录、写索引、写单条错题、刷新记忆。
@@ -147,7 +147,7 @@ MistakebookSkill/
 | 文件 | 作用 | 说明 |
 | --- | --- | --- |
 | `commands/mistakebook.md` | 手动进入错题集总入口 | 支持无参数进入错题集，也支持 `on`、`off`、`status`、`consolidate`、`ascended` 等路由。它相当于人工手动切换和运维入口。 |
-| `commands/ascended.md` | 手动进入 Ascended Mode 的快捷入口 | 这个文件只做一件事：把当前问题强制拉入神级模式，并要求宿主先输出固定神级回复语，再执行全量检索和深度分析。 |
+| `commands/ascended.md` | 手动进入飞升模式（Ascended Mode）的快捷入口 | 这个文件只做一件事：把当前问题强制拉入飞升模式，并要求宿主先输出固定飞升模式回复语，再执行全量检索和深度分析。 |
 
 ### 4.6 `docs/`
 
@@ -163,7 +163,7 @@ MistakebookSkill/
 | 文件 | 作用 | 说明 |
 | --- | --- | --- |
 | `evals/trigger-prompts/should-trigger.txt` | 普通纠错触发样例集 | 收录“你这里错了”“重新改”“按我说的改”等应该进入错题集纠错闭环的表达。改 matcher 时应先看它。 |
-| `evals/trigger-prompts/should-trigger-ascended.txt` | 神级模式触发样例集 | 收录应该直接或很快进入 Ascended Mode 的表达，例如 `/ascended`、用户明确要求“按最有效的方法处理”。 |
+| `evals/trigger-prompts/should-trigger-ascended.txt` | 飞升模式触发样例集 | 收录应该直接或很快进入 Ascended Mode 的表达，例如 `/ascended`、用户明确要求“按最有效的方法处理”。 |
 | `evals/trigger-prompts/should-not-trigger.txt` | 误触发防线样例集 | 收录“程序报错了”“继续实现功能”“解释代码”等不应自动进入错题集闭环的表达，用来防止 matcher 过宽。 |
 
 ### 4.8 `hooks/`
@@ -173,8 +173,8 @@ MistakebookSkill/
 | 文件 | 作用 | 说明 |
 | --- | --- | --- |
 | `hooks/hooks.json` | Claude 风格 Hook 注册表 | 把不同事件和不同脚本关联起来。这里定义了 `UserPromptSubmit`、`PreCompact`、`SessionStart` 三大事件分别做什么。 |
-| `hooks/correction-trigger.sh` | 纠错模式自动触发脚本 | 当用户输入命中纠错 matcher 时，向宿主注入一段高优先级提示，强制要求激活错题集 Skill、输出固定激活句、维护 rejection 计数、必要时升级神级模式。 |
-| `hooks/ascended-trigger.sh` | 神级模式自动触发脚本 | 当用户输入命中神级模式 matcher 时，向宿主注入一段高优先级提示，要求立即进入 Ascended Mode、检索所有知识源、解释前几次纠错失败原因。 |
+| `hooks/correction-trigger.sh` | 纠错模式自动触发脚本 | 当用户输入命中纠错 matcher 时，向宿主注入一段高优先级提示，强制要求激活错题集 Skill、输出固定激活句、维护 rejection 计数、必要时升级飞升模式。 |
+| `hooks/ascended-trigger.sh` | 飞升模式自动触发脚本 | 当用户输入命中飞升模式 matcher 时，向宿主注入一段高优先级提示，要求立即进入 Ascended Mode、检索所有知识源、解释前几次纠错失败原因。 |
 | `hooks/session-restore.sh` | 压缩后会话恢复脚本 | 在会话恢复时检查 `~/.mistakebook/runtime-journal.md` 是否存在且足够新，如果有，就提醒宿主继续同一个 case，而不是新开一个纠错案例。 |
 
 #### `hooks/hooks.json` 的实际事件职责
@@ -232,11 +232,11 @@ MistakebookSkill/
 
 | 文件 | 作用 | 说明 |
 | --- | --- | --- |
-| `skills/mistakebook/SKILL.md` | 通用核心 Skill 主文件 | 规定触发条件、固定激活句、固定追问句、固定神级回复语、状态机、归档条件、scope 判断、周期性 rollup 规则，是整个项目的最高级行为协议。 |
+| `skills/mistakebook/SKILL.md` | 通用核心 Skill 主文件 | 规定触发条件、固定激活句、固定追问句、固定飞升模式回复语、状态机、归档条件、scope 判断、周期性 rollup 规则，是整个项目的最高级行为协议。 |
 | `skills/mistakebook/agents/openai.yaml` | 通用 Skill 的 UI 元数据 | 决定技能显示名、短描述、默认引导提示词，以及是否支持隐式触发。 |
 | `skills/mistakebook/references/activation-patterns.md` | 触发样式参考 | 说明哪些表达该触发错题集，哪些不该触发，哪些 follow-up 仍算同一个 case。 |
 | `skills/mistakebook/references/archive-schema.md` | 归档结构参考 | 定义归档 JSON payload、单条 Markdown 结构、项目记忆/全局记忆模板以及写法原则。 |
-| `skills/mistakebook/references/ascended-mode.md` | 神级模式参考 | 定义 Ascended Mode 的含义、自动/手动触发条件、进入后必须检索的来源与最低输出要求。 |
+| `skills/mistakebook/references/ascended-mode.md` | 飞升模式参考 | 定义 Ascended Mode 的含义、自动/手动触发条件、进入后必须检索的来源与最低输出要求。 |
 | `skills/mistakebook/references/storage-and-scope.md` | 存储与作用域参考 | 规定项目级/全局级目录布局、`project/global/both` 的判断标准、记忆文件的写法边界。 |
 
 #### `skills/mistakebook/SKILL.md` 为什么是核心文件
@@ -260,7 +260,7 @@ MistakebookSkill/
 | `vscode/copilot-instructions.md` | VSCode 侧总说明 | 用更适合 Copilot 指令体系的方式浓缩错题集规则，告诉编辑器何时接管纠错流程。 |
 | `vscode/instructions/mistakebook.instructions.md` | VSCode 侧详细指令文件 | 进一步细化触发样例、完成样例、Ascended Mode 规则、目录约定和最低归档内容。 |
 | `vscode/prompts/mistakebook.prompt.md` | VSCode 侧手动启动错题集 Prompt | 当用户显式调用这个 prompt 时，它会要求宿主进入错题集闭环。 |
-| `vscode/prompts/ascended.prompt.md` | VSCode 侧手动启动神级模式 Prompt | 当用户显式调用这个 prompt 时，它会要求宿主立刻进入 Ascended Mode。 |
+| `vscode/prompts/ascended.prompt.md` | VSCode 侧手动启动飞升模式 Prompt | 当用户显式调用这个 prompt 时，它会要求宿主立刻进入 Ascended Mode。 |
 
 ### 4.12 `reference_code/`
 
@@ -381,7 +381,7 @@ Claude 风格宿主真正会关心的文件链路是：
 3. `commands/mistakebook.md`
    - 让用户可以手动启动错题集。
 4. `commands/ascended.md`
-   - 让用户可以手动启动神级模式。
+   - 让用户可以手动启动飞升模式。
 5. `hooks/hooks.json`
    - 让宿主在用户输入时自动匹配纠错关键词或神级触发关键词。
 6. `hooks/*.sh`
@@ -403,7 +403,7 @@ Claude 风格宿主真正会关心的文件链路是：
    - `commands/mistakebook.md` 负责路由到核心 Skill。
 3. 手动神级入口
    - 用户输入 `/ascended`，或者明确说“你需要根据你见过最有效的方法来处理这个问题”。
-   - `ascended-trigger.sh` 或 `commands/ascended.md` 会把流程拉入神级模式。
+   - `ascended-trigger.sh` 或 `commands/ascended.md` 会把流程拉入飞升模式。
 
 ### 6.6 Claude 侧运行后会把数据写到哪里
 
@@ -513,7 +513,7 @@ Codex 的主读取链路通常是：
 2. 手动启动错题集
    - `$mistakebook`
    - `/prompts:mistakebook`
-3. 手动升级到神级模式
+3. 手动升级到飞升模式
    - 直接说：`你需要根据你见过最有效的方法来处理这个问题`
 4. 通过错题集命令参数升级
    - `mistakebook ascended`
@@ -586,7 +586,7 @@ Codex 的主读取链路通常是：
 1. 同一个 case 被否定两次以上
    - 或用户显式输入 `/ascended`
    - 或用户说“你需要根据你见过最有效的方法来处理这个问题”
-2. Agent 先输出固定神级回复语
+2. Agent 先输出固定飞升模式回复语
 3. Agent 检索：
    - 项目级错题
    - 项目级记忆
@@ -635,7 +635,7 @@ Codex 的主读取链路通常是：
 
 1. 用 `$mistakebook` 或 `/prompts:mistakebook` 明确接管本次纠错。
 2. 如果它还在浅层修补
-   - 用自然语言触发神级模式。
+   - 用自然语言触发飞升模式。
 3. 完成后明确告诉它：
    - `可以了`
    - `归档吧`
@@ -658,7 +658,7 @@ Codex 的主读取链路通常是：
 2. `skills/mistakebook/SKILL.md`
    - 再理解核心协议。
 3. `skills/mistakebook/references/*.md`
-   - 把触发、归档、作用域、神级模式补齐。
+   - 把触发、归档、作用域、飞升模式补齐。
 4. `scripts/mistakebook_cli.py`
    - 理解真实落盘方式。
 5. `commands/*.md`
@@ -672,4 +672,4 @@ Codex 的主读取链路通常是：
 
 如果只用一句话概括本仓库，可以写成：
 
-`Mistakebook Skill 是一个把“用户纠错”转化为“持续纠错闭环 + 项目级/全局级案例归档 + 精炼记忆刷新 + 多次失败后自动升级神级模式”的多宿主 Skill 项目。`
+`Mistakebook Skill 是一个把“用户纠错”转化为“持续纠错闭环 + 项目级/全局级案例归档 + 精炼记忆刷新 + 多次失败后自动升级飞升模式”的多宿主 Skill 项目。`

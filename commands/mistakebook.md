@@ -1,5 +1,5 @@
 ---
-description: "错题集 Skill。/mistakebook [on|off|status|consolidate|ascended|任务描述]。识别用户纠错状态、进入纠错闭环、完成后归档到项目/全局错题集并刷新记忆；当用户反复纠正仍未完成时，或用户要求按最有效方法处理时，升级到 Ascended 神级模式。"
+description: "错题集 Skill。/mistakebook [on|off|status|consolidate|ascended|任务描述]。识别用户纠错状态、进入纠错闭环、完成后归档到项目/全局错题集并刷新记忆；当用户反复纠正仍未完成时，或用户要求按最有效方法处理时，升级到飞升模式（Ascended Mode）。"
 argument-hint: "[on|off|status|consolidate|ascended]"
 ---
 
@@ -22,8 +22,8 @@ argument-hint: "[on|off|status|consolidate|ascended]"
 - **consolidate**
   - 读取当前项目和全局错题索引，重写项目记忆和全局记忆
 - **ascended**
-  - 立刻进入 Ascended 神级模式
-  - 先输出固定神级回复语
+  - 立刻进入飞升模式（Ascended Mode）
+  - 先输出固定飞升模式回复语
   - 全面检索项目级 / 全局级错题与记忆后，再处理当前问题
 
 ## 执行规则

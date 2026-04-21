@@ -1,7 +1,7 @@
 interface:
   display_name: "错题集"
-  short_description: "接管纠错闭环，并在需要时升级神级模式"
-  default_prompt: "Use $mistakebook to接管这次纠错；如果我纠正两次以上仍不满意，或我输入 /ascended，就进入神级模式。"
+  short_description: "接管纠错闭环，并在需要时升级飞升模式"
+  default_prompt: "Use $mistakebook to接管这次纠错；如果我纠正两次以上仍不满意，或我输入 /ascended，就进入飞升模式。"
 
 policy:
   allow_implicit_invocation: true

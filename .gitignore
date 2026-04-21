@@ -1,6 +1,6 @@
 # Local reference repository, not part of the distributable project
 reference_code/
-docs/错题集能力/
+docs/project structure/
 
 # Python cache
 __pycache__/

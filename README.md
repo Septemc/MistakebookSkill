@@ -10,7 +10,7 @@
 2. 可复用的项目级经验
 3. 可泛化的全局级规则
 4. 未来可再次回注给 Agent 的精炼记忆
-5. 在多次纠错仍失败时自动升级的 Ascended 神级模式
+5. 在多次纠错仍失败时自动升级的飞升模式（Ascended Mode）
 
 仓库主要内容如下：
 
@@ -20,7 +20,7 @@
 4. VSCode Copilot 指令 / prompt 适配
 5. 本地归档 CLI
 6. 触发词回归样例
-7. Ascended 神级模式协议
+7. 飞升模式（Ascended Mode）协议
 
 ## 它解决什么问题
 
@@ -53,11 +53,11 @@
 
 一旦进入纠错模式，Agent 必须先展示固定激活文案：
 
-`【我发现这道题做错了，我接下来会进行纠错，并根据你的纠错信息，持续纠错直到完成，然后写入我的错题集】`
+`<错题集.Skill>我接下来会进行纠错，并根据你的纠错信息，持续纠错直到完成，然后写入我的错题集。`
 
 之后每一轮纠错结束，如果用户还没有明确确认完成，都必须在结尾继续追问：
 
-`我当前有没有把问题吃透，有没有纠正错误，如果没有的话，麻烦你再教我一遍，好不好？（如果我已经完成了纠错，也请你告知我一声，我可以把错题写入我的错题集）`
+`我有没有吃透当前问题，是否成功纠正错误，如果没有的话，请你再教我一遍。（如果我已经完成了纠错，也请你告诉我一声，我可以把错题写入我的错题集）`
 
 ### 3. 只在用户明确确认后归档
 
@@ -93,7 +93,7 @@
 
 记忆必须保持短、真、可执行，不允许退化成聊天流水账。
 
-### 6. Ascended 神级模式
+### 6. 飞升模式（Ascended Mode）
 
 当普通纠错已经进行了两次以上，用户仍然认为 Agent 没有改对，或者用户明确要求：
 
@@ -102,7 +102,7 @@
 
 Skill 会升级到 `Ascended Mode`。
 
-进入神级模式时，Agent 必须先输出固定回复语：
+进入飞升模式时，Agent 必须先输出固定回复语：
 
 `我现在会根据我见过最有效的方法来处理这个问题，我将检索我的所有知识库，我现在什么都不缺了！`
 
@@ -126,11 +126,11 @@ Skill 会升级到 `Ascended Mode`。
 这个项目吸收了 Storydex 错题集能力和多宿主 Skill 分发结构的优点，但做了几个明确增强：
 
 1. 从“项目级纠错归档”扩展成“项目级 + 全局级”双层记忆
-2. 把固定激活文案、固定追问文案、固定神级回复文案都写成硬约束
+2. 把固定激活文案、固定追问文案、固定飞升模式回复文案都写成硬约束
 3. 提供本地 CLI，避免只停留在 Prompt 设计层
 4. 为多宿主准备统一核心 Skill，再分别适配 Codex / Claude / VSCode
 5. 增加 `evals/trigger-prompts`，方便回归测试误触发和漏触发
-6. 引入 Ascended 神级模式，让多次纠错失败后的处理从“继续修补”升级为“全面检索 + 深度分析 + 选最强方案”
+6. 引入飞升模式（Ascended Mode），让多次纠错失败后的处理从“继续修补”升级为“全面检索 + 深度分析 + 选最强方案”
 
 ## 仓库结构
 
@@ -160,7 +160,7 @@ Skill 会升级到 `Ascended Mode`。
 - [skills/mistakebook/references/archive-schema.md](./skills/mistakebook/references/archive-schema.md)
   - 归档 JSON 和 Markdown 结构
 - [skills/mistakebook/references/ascended-mode.md](./skills/mistakebook/references/ascended-mode.md)
-  - Ascended 神级模式协议
+  - 飞升模式（Ascended Mode）协议
 - [codex/mistakebook/SKILL.md](./codex/mistakebook/SKILL.md)
   - Codex 精简版协议
 - [scripts/mistakebook_cli.py](./scripts/mistakebook_cli.py)
@@ -170,11 +170,11 @@ Skill 会升级到 `Ascended Mode`。
 - [hooks/correction-trigger.sh](./hooks/correction-trigger.sh)
   - 普通纠错闭环触发提示
 - [hooks/ascended-trigger.sh](./hooks/ascended-trigger.sh)
-  - 神级模式触发提示
+  - 飞升模式触发提示
 - [commands/mistakebook.md](./commands/mistakebook.md)
   - `/mistakebook` 命令路由
 - [commands/ascended.md](./commands/ascended.md)
-  - `/ascended` 神级模式入口
+  - `/ascended` 飞升模式入口
 
 ## 安装与接入
 
@@ -189,7 +189,7 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 2. 手动触发错题集
    - `$mistakebook`
    - `/prompts:mistakebook`
-3. 手动触发神级模式
+3. 手动触发飞升模式
    - `/ascended`
    - `你需要根据你见过最有效的方法来处理这个问题`
 
@@ -327,21 +327,21 @@ python scripts/mistakebook_cli.py config --auto-detect off
 3. 开始纠错闭环
 4. 完成后归档
 
-### 场景 3：自动升级到神级模式
+### 场景 3：自动升级到飞升模式
 
 1. 用户已经让 Agent 改了两次或以上
 2. 用户仍然明确表示“不对 / 还是错 / 没理解”
 3. Agent 自动进入 Ascended Mode
-4. Agent 输出固定神级回复语
+4. Agent 输出固定飞升模式回复语
 5. 全面检索项目级 / 全局级知识
 6. 解释前几次纠错为什么失败
 7. 选择当前最有效的方法重新处理
 
-### 场景 4：手动启动神级模式
+### 场景 4：手动启动飞升模式
 
 1. 用户输入 `/ascended`
 2. 或者用户说：`你需要根据你见过最有效的方法来处理这个问题`
-3. Agent 输出神级模式固定回复语
+3. Agent 输出飞升模式固定回复语
 4. 全面检索项目级 / 全局级知识
 5. 解释前几次纠错为什么失败
 6. 选择最有效的方法重新处理
@@ -380,7 +380,7 @@ python scripts/mistakebook_cli.py config --auto-detect off
 5. 本地 CLI 归档工具
 6. 项目级 / 全局级双层记忆目录约定
 7. 触发词回归样例
-8. Ascended 神级模式协议与手动入口
+8. 飞升模式（Ascended Mode）协议与手动入口
 
 ## 后续还可以继续增强的方向
 

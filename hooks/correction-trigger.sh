@@ -19,9 +19,9 @@ The user is correcting you. Mistakebook correction mode is now active.
 You MUST do all of the following:
 1. Immediately load the `mistakebook` skill if it is not already active.
 2. On your next correction response, first display exactly:
-【我发现这道题做错了，我接下来会进行纠错，并根据你的纠错信息，持续纠错直到完成，然后写入我的错题集】
+<错题集.Skill>我接下来会进行纠错，并根据你的纠错信息，持续纠错直到完成，然后写入我的错题集。
 3. After every correction turn, unless the user has explicitly confirmed completion, end with exactly:
-我当前有没有把问题吃透，有没有纠正错误，如果没有的话，麻烦你再教我一遍，好不好？（如果我已经完成了纠错，也请你告知我一声，我可以把错题写入我的错题集）
+我有没有吃透当前问题，是否成功纠正错误，如果没有的话，请你再教我一遍。（如果我已经完成了纠错，也请你告诉我一声，我可以把错题写入我的错题集）
 4. Do not archive the case until the user explicitly says the correction is complete.
 5. When the user confirms completion, summarize the case, decide whether it is project/global/both, archive it, and refresh memory.
 6. Maintain a rejection counter for this case. If the same case has already been rejected twice or more, immediately escalate into Ascended Mode before your next substantive fix.

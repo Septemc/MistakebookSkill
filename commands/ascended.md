@@ -1,8 +1,8 @@
 ---
-description: "进入错题集 Skill 的 Ascended 神级模式。触发语：/ascended，或“你需要根据你见过最有效的方法来处理这个问题”。"
+description: "进入错题集 Skill 的飞升模式（Ascended Mode）。触发语：/ascended，或“你需要根据你见过最有效的方法来处理这个问题”。"
 ---
 
-立刻进入 `mistakebook` 的 Ascended 神级模式，并严格执行以下步骤：
+立刻进入 `mistakebook` 的飞升模式（Ascended Mode），并严格执行以下步骤：
 
 1. 先输出固定回复语：
    `我现在会根据我见过最有效的方法来处理这个问题，我将检索我的所有知识库，我现在什么都不缺了！`

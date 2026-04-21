@@ -190,7 +190,7 @@ def render_case_markdown(payload: dict[str, Any], file_name: str) -> str:
         "## 归档范围判断",
         render_bullets(ensure_list(payload.get("scopeReasoning"))),
         "",
-        "## 神级模式记录",
+        "## 飞升模式记录",
         render_bullets(
             [
                 f"ascended_triggered: {payload.get('ascendedTriggered', False)}",
@@ -198,7 +198,7 @@ def render_case_markdown(payload: dict[str, Any], file_name: str) -> str:
             ]
         ),
         "",
-        "## 神级模式检索来源",
+        "## 飞升模式检索来源",
         render_bullets(ensure_list(payload.get("knowledgeSourcesReviewed"))),
         "",
         "## 原始问题",

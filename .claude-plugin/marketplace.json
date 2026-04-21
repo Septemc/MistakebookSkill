@@ -1,6 +1,6 @@
 {
   "name": "mistakebook-skills",
-  "description": "错题集 Skill。识别用户进入纠错状态，强制执行“纠错-确认-归档-记忆刷新”闭环，并在多次纠错仍失败时自动升级到 Ascended 神级模式。",
+  "description": "错题集 Skill。识别用户进入纠错状态，强制执行“纠错-确认-归档-记忆刷新”闭环，并在多次纠错仍失败时自动升级到飞升模式（Ascended Mode）。",
   "owner": {
     "name": "Septemc"
   },
