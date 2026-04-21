@@ -1,5 +1,13 @@
 # Mistakebook Skill 项目结构与安装使用说明
 
+> 说明
+>
+> 自 2026-04-21 起，本项目已经升级为“错题集 + 记事本 + 缓存式记忆 + 飞升模式全量检索”的统一模型。
+>
+> 当前行为协议、目录结构、CLI 能力和宿主入口请优先以仓库根目录的 `README.md`、`skills/mistakebook/SKILL.md` 以及 `skills/mistakebook/references/` 下的文档为准。
+>
+> 本文档仍可作为结构参考，但如果与上述文件有冲突，请以上述文件为准。
+
 - 项目名称：Mistakebook Skill
 - 作者：Septemc
 - 文档日期：2026-04-20

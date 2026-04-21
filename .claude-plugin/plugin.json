@@ -1,7 +1,7 @@
 {
   "name": "mistakebook",
   "version": "1.0.0",
-  "description": "Detects correction scenarios, keeps the agent in an explicit correction loop until the user confirms completion, escalates into Ascended Mode after repeated failed corrections or manual trigger, then archives detailed cases into project/global mistakebooks and refreshes distilled memory.",
+  "description": "Detects correction or long-term note-taking scenarios, keeps the agent in an explicit closed loop until the user confirms completion, escalates into Ascended Mode after repeated failed corrections or manual trigger, archives detailed `mistake` / `note` entries into project/global stores, and refreshes cache-like distilled memory.",
   "author": {
     "name": "Septemc"
   },
@@ -9,8 +9,9 @@
   "keywords": [
     "mistakebook",
     "correction",
+    "notebook",
     "ascended",
-    "memory",
+    "memory-cache",
     "archive",
     "claude"
   ]

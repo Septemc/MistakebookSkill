@@ -1,13 +1,13 @@
 {
   "name": "mistakebook-skills",
-  "description": "错题集 Skill。识别用户进入纠错状态，强制执行“纠错-确认-归档-记忆刷新”闭环，并在多次纠错仍失败时自动升级到飞升模式（Ascended Mode）。",
+  "description": "错题集 / 记事本 Skill。识别用户进入纠错状态或主动记录事项的状态，强制执行“整理-确认-归档-记忆刷新”闭环，并在多次纠错仍失败时自动升级到飞升模式（Ascended Mode）。",
   "owner": {
     "name": "Septemc"
   },
   "plugins": [
     {
       "name": "mistakebook",
-      "description": "错题集 Skill for Claude-style plugin hosts. Includes automatic correction detection hooks, Ascended Mode escalation, session restore, manual /mistakebook and /ascended routing, detailed case archiving, and project/global memory refresh.",
+      "description": "错题集 / 记事本 Skill for Claude-style plugin hosts. Includes automatic correction detection hooks, notebook capture hints, Ascended Mode escalation, session restore, manual /mistakebook / notebook / ascended routing, detailed entry archiving, and project/global cache-memory refresh.",
       "version": "1.0.0",
       "source": "./",
       "author": {

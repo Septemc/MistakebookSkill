@@ -29,16 +29,16 @@ escape_for_json() {
 
 read -r -d '' RESTORE_MSG << 'EOF' || true
 [Mistakebook Session Restore]
-A recent correction loop checkpoint exists at ~/.mistakebook/runtime-journal.md.
+A recent mistakebook checkpoint exists at ~/.mistakebook/runtime-journal.md.
 
-If the user is still discussing the same issue, immediately read that file and resume the same correction state instead of creating a brand-new case.
+If the user is still discussing the same issue or the same long-term note, immediately read that file and resume the same state instead of creating a brand-new case.
 
 Restore at least:
 1. current status
 2. project_root
 3. case_id
 4. original prompt / original reply summary
-5. accumulated correction feedback
+5. accumulated correction or note feedback
 6. latest fixed reply summary
 7. scope guess
 8. rejection_count / correction_attempt_count
@@ -46,9 +46,10 @@ Restore at least:
 10. which knowledge sources had already been reviewed
 
 Important:
-- Do not archive until the user explicitly confirms completion.
+- Do not archive until the user explicitly confirms completion or asks to write the item into the notebook.
 - If the activation sentence was already shown in the same case, do not repeat it unless you are clearly re-entering correction mode after a long interruption.
 - If correction mode is active, keep ending correction turns with the exact fixed follow-up question.
+- If a stable long-term item was already being discussed, keep using the exact notebook follow-up sentence when relevant.
 - If Ascended Mode was already active for the same case, do not silently downgrade back to shallow correction.
 EOF
 

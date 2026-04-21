@@ -1,7 +1,7 @@
 interface:
   display_name: "错题集"
-  short_description: "进入纠错闭环，并在需要时升级到飞升模式"
-  default_prompt: "Use $mistakebook to接管当前纠错流程；如果我已纠正两次仍未完成，或我输入 /ascended，就进入飞升模式后再处理。"
+  short_description: "接管错题集 / 记事本闭环，并维护缓存式记忆"
+  default_prompt: "Use $mistakebook to接管当前纠错或长期事项记录；如果我已纠正两次仍未完成，或我输入 /ascended，就进入飞升模式后再处理。"
 
 policy:
   allow_implicit_invocation: true

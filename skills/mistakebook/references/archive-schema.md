@@ -1,57 +1,79 @@
 # Archive Schema
 
-## 归档 payload
+## 统一条目模型
 
-推荐使用下面的 JSON 结构：
+从现在开始，归档条目不再只有“错题”一种，而是统一支持两类：
+
+1. `mistake`
+   - 已经完成纠错、值得复盘的错误案例
+2. `note`
+   - 不一定是错误，但值得长期注意、主动记录的事项
+
+两类条目都进入同一个 store：
+
+1. 详细条目分别落到 `failures/` 或 `notes/`
+2. 同时进入 `state/catalog.json`
+3. 每次写入后都要刷新 `memory/`
+4. 必要时再执行一次 `consolidate`
+
+## 推荐 payload
 
 ```json
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
+  "entryType": "mistake",
   "host": "codex",
   "agentId": "codex",
   "sessionId": "optional",
   "traceId": "optional",
   "caseId": "optional",
-  "archivedAt": "2026-04-19T15:00:00Z",
-  "title": "没有先读真实文件就下结论",
-  "summary": "本次错误的核心是没有先核对真实文件，导致判断偏离实际代码。",
-  "mistakeTypes": ["fact-check", "premature-assumption"],
+  "archivedAt": "2026-04-21T08:00:00Z",
+  "title": "没有先读真实文件就修改协议",
+  "summary": "修改协议前没有先读真实实现，导致多宿主规则开始漂移。",
   "severity": "medium",
-  "correctionAttemptCount": 3,
-  "ascendedTriggered": true,
-  "ascendedTriggerReason": "同一个案例被用户连续否定两次后自动升级",
+  "scopeDecision": "both",
+  "scopeReasoning": [
+    "问题发生在当前仓库协议和脚本之间，项目内需要复盘",
+    "先读真实实现再改协议也是稳定的通用规则"
+  ],
+  "keywords": ["read-first", "protocol-sync"],
+  "rules": [
+    "修改系统协议前，先阅读真实实现与真实入口"
+  ],
+  "confirmedUnderstanding": [
+    "我已经理解：协议更新必须先和真实脚本对齐"
+  ],
+  "whatWentWrong": [
+    "先改文案，后看实现，导致行为口径不一致"
+  ],
+  "preventionChecklist": [
+    "先读核心脚本",
+    "先读核心 Skill",
+    "再同步宿主镜像"
+  ],
+  "projectMemoryDelta": [
+    "协议更新前先核对核心脚本与多宿主镜像"
+  ],
+  "globalMemoryDelta": [
+    "在修改系统协议前先核对真实实现与入口"
+  ],
   "knowledgeSourcesReviewed": [
     "project_failures",
+    "project_notes",
     "project_memory",
     "global_failures",
+    "global_notes",
     "global_memory",
     "current_repo_files"
   ],
-  "scopeDecision": "both",
-  "scopeReasoning": [
-    "这次案例发生在当前仓库的具体文件上，项目内有复盘价值",
-    "但“先读真实文件再下结论”也是稳定的全局规则"
-  ],
-  "keywords": ["read-first", "fact-check", "source-of-truth"],
-  "rules": [
-    "在评价实现是否正确前，先读真实文件或真实输出",
-    "用户开始纠正时，先进入纠错闭环，不要把纠正当作普通补充需求"
-  ],
-  "confirmedUnderstanding": [
-    "我已经理解：事实来源必须优先于记忆和猜测",
-    "我已经理解：用户确认完成前不能提前归档"
-  ],
-  "whatWentWrong": [
-    "过早根据印象判断实现细节",
-    "没有把用户纠正视为同一个持续案例"
-  ],
-  "preventionChecklist": [
-    "先读真实文件",
-    "先核对输出证据",
-    "未获确认前不归档"
-  ],
-  "projectMemoryMarkdown": "# 项目记忆\n...",
-  "globalMemoryMarkdown": "# 全局记忆\n...",
+  "correctionAttemptCount": 3,
+  "ascendedTriggered": true,
+  "ascendedTriggerReason": "手动要求按最有效方式处理",
+  "memoryPriority": 0.0,
+  "retrievalCount": 2,
+  "lastRetrievedAt": "2026-04-21T08:10:00Z",
+  "hitCount": 1,
+  "lastHitAt": "2026-04-21T08:12:00Z",
   "originalPrompt": "用户原始问题",
   "originalReply": "你的原始回答",
   "correctionFeedback": "用户的纠错说明",
@@ -63,40 +85,69 @@
 }
 ```
 
+## note 条目额外字段
+
+当 `entryType = "note"` 时，推荐额外补这些字段：
+
+```json
+{
+  "entryType": "note",
+  "title": "新增记事本时记得同步缓存记忆",
+  "summary": "记事本不是错题，但同样要回写项目记忆和全局记忆。",
+  "noteReason": "这是长期有效的实现约束，不应该只停留在聊天里。",
+  "noteContent": [
+    "记事本记录主动注意事项，不要求它一定是错题"
+  ],
+  "noteActionItems": [
+    "归档 note 后刷新 project/global memory",
+    "consolidate 时一起参与遗忘整理"
+  ],
+  "noteContext": "用户要求增加记事本功能，并要求和错题集共用缓存记忆机制。"
+}
+```
+
 ## 最低要求
 
-下面字段最少要有：
+### mistake
 
-1. `title`
-2. `summary`
-3. `rules`
-4. `confirmedUnderstanding`
-5. `scopeDecision`
-6. `scopeReasoning`
-7. `correctionAttemptCount`
-8. `ascendedTriggered`
-9. `ascendedTriggerReason`
-10. `originalPrompt`
-11. `originalReply`
-12. `correctionFeedback`
-13. `finalReply`
+至少包含：
+
+1. `entryType`
+2. `title`
+3. `summary`
+4. `scopeDecision`
+5. `scopeReasoning`
+6. `rules`
+7. `confirmedUnderstanding`
+8. `originalPrompt`
+9. `correctionFeedback`
+10. `finalReply`
+
+### note
+
+至少包含：
+
+1. `entryType`
+2. `title`
+3. `summary`
+4. `scopeDecision`
+5. `scopeReasoning`
+6. `rules`
+7. `confirmedUnderstanding`
+8. `noteReason`
+9. `noteContent`
 
 ## 单条 Markdown 结构
 
-推荐写成下面这种结构化 Markdown：
+### mistake
 
 ```markdown
 # 标题
 
+- entry_type: mistake
 - archived_at: ...
 - host: ...
-- session: ...
-- trace: ...
 - scope: ...
-- severity: ...
-- correction_attempt_count: ...
-- ascended_triggered: ...
-- keywords: ...
 
 ## 错误总结
 ...
@@ -113,9 +164,6 @@
 ## 下次开始前自检
 - ...
 
-## 归档范围判断
-- ...
-
 ## 飞升模式记录
 - ...
 
@@ -125,72 +173,106 @@
 ## 原始问题
 ...
 
-## 原始回答
-...
-
 ## 用户纠错反馈
 ...
 
-## 追纠记录
-1. ...
-
 ## 最终正确回答
 ...
-
-## 项目记忆增量
-- ...
-
-## 全局记忆增量
-- ...
 ```
 
-## 记忆文档模板
-
-### 项目记忆
+### note
 
 ```markdown
-# 项目记忆
+# 标题
 
-- updated_at: ...
-- source_cases: ...
+- entry_type: note
+- archived_at: ...
+- host: ...
+- scope: ...
 
-## 当前稳定规则
+## 事项总结
+...
+
+## 为什么值得记录
+...
+
+## 需要注意
 - ...
 
-## 已经吃透
+## 建议行动
 - ...
 
-## 高风险提醒
+## 来源上下文
+...
+
+## 已经确认的稳定规则
 - ...
 
-## 最近一次刷新原因
-- ...
-```
-
-### 全局记忆
-
-```markdown
-# 全局记忆
-
-- updated_at: ...
-- source_cases: ...
-
-## 通用稳定规则
-- ...
-
-## 通用已吃透
-- ...
-
-## 通用高风险提醒
-- ...
-
-## 最近一次刷新原因
+## 已经吃透的点
 - ...
 ```
 
-## 写法原则
+## catalog.json 建议保留的字段
 
-1. 详细案例写全
-2. 记忆摘要写短
-3. 全局条目适度泛化
-4. 只写已经确认、真实有效、未来值得再次注入的内容
+为了支撑缓存式记忆和遗忘整理，`state/catalog.json` 至少要保留：
+
+1. `caseId`
+2. `entryType`
+3. `title`
+4. `relativePath`
+5. `archivedAt`
+6. `scopeDecision`
+7. `summary`
+8. `rules`
+9. `confirmedUnderstanding`
+10. `projectMemoryDelta`
+11. `globalMemoryDelta`
+12. `noteContent`
+13. `noteActionItems`
+14. `retrievalCount`
+15. `lastRetrievedAt`
+16. `hitCount`
+17. `lastHitAt`
+18. `memoryPriority`
+
+## 记忆缓存状态
+
+为了让“记忆不是无限增长的长文，而是会整理、会遗忘的缓存”，每个 store 还应该维护：
+
+1. `state/memory_state.json`
+
+推荐包含：
+
+1. `updatedAt`
+2. `memoryThreshold`
+3. `staleAfterDays`
+4. `reason`
+5. `activeEntries`
+6. `deferredEntries`
+
+其中：
+
+1. `activeEntries`
+   - 当前仍在缓存里的高价值条目
+2. `deferredEntries`
+   - 因为“过旧、低命中、低优先级”而暂时退出缓存的条目
+
+## 记忆写法原则
+
+项目记忆和全局记忆都不是“第二份详细归档”，而是缓存层。
+
+写法上要遵守：
+
+1. 只写高密度、可执行、未来值得再次注入的内容
+2. 优先写稳定规则和主动注意事项
+3. 达到阈值后，保留高命中、高检索、最近仍活跃的内容
+4. 对长期没有命中的条目执行“暂时遗忘”，但不要删除详细条目
+
+## 推荐 CLI
+
+```bash
+python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-file payload.json
+python scripts/mistakebook_cli.py touch --host codex --project-root . --scope both --case-id <case-id> --kind hit
+python scripts/mistakebook_cli.py consolidate --host codex --project-root . --scope both
+python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
+```

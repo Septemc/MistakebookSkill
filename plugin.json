@@ -1,7 +1,7 @@
 {
   "name": "mistakebook",
   "version": "1.0.0",
-  "description": "Mistakebook Skill for agents. Detects user correction mode, enters a correction loop with explicit completion confirmation, escalates into Ascended Mode after repeated failed corrections or manual trigger, archives detailed mistake cases into project/global stores, and refreshes distilled memory for future reuse.",
+  "description": "Mistakebook Skill for agents. Detects user correction mode or long-term note-taking mode, enters an explicit closed loop with confirmation, escalates into Ascended Mode after repeated failed corrections or manual trigger, archives detailed `mistake` / `note` entries into project/global stores, and refreshes cache-like memory for future reuse.",
   "author": {
     "name": "Septemc"
   },
@@ -9,8 +9,10 @@
   "keywords": [
     "mistakebook",
     "correction-loop",
+    "notebook",
     "ascended-mode",
     "agent-memory",
+    "memory-cache",
     "project-memory",
     "global-memory",
     "codex",
