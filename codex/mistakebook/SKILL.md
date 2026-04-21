@@ -114,9 +114,86 @@ description: "识别用户正在纠正你、要求返工、指出你重复犯错
 
 ```bash
 python scripts/mistakebook_cli.py bootstrap --host codex --project-root .
-python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-file <temp-json>
 python scripts/mistakebook_cli.py consolidate --host codex --project-root . --scope both
 python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
+```
+
+归档时三选一：
+
+1. `--payload-file <file>`
+2. `--payload '<json>'`
+3. `--payload-stdin`
+
+推荐优先使用 `--payload-stdin`，这样不需要先写临时 JSON 文件。
+
+### `mistake` 最小模板
+
+```json
+{
+  "entryType": "mistake",
+  "title": "一句话标题",
+  "summary": "一句话总结",
+  "scopeDecision": "project",
+  "scopeReasoning": ["为什么归到这个 scope"],
+  "rules": ["以后必须遵守什么"],
+  "confirmedUnderstanding": ["这次已经吃透了什么"],
+  "originalPrompt": "用户原始问题",
+  "correctionFeedback": "用户的纠错反馈",
+  "finalReply": "修正后的最终回答"
+}
+```
+
+### `note` 最小模板
+
+```json
+{
+  "entryType": "note",
+  "title": "一句话标题",
+  "summary": "一句话总结",
+  "scopeDecision": "project",
+  "scopeReasoning": ["为什么归到这个 scope"],
+  "rules": ["以后必须注意什么"],
+  "confirmedUnderstanding": ["这条事项为什么成立"],
+  "noteReason": "为什么值得长期记录",
+  "noteContent": ["这条事项的核心内容"]
+}
+```
+
+### bash 示例
+
+```bash
+cat <<'EOF' | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+{
+  "entryType": "mistake",
+  "title": "没有先读真实实现",
+  "summary": "修改前没有先核对真实脚本实现。",
+  "scopeDecision": "both",
+  "scopeReasoning": ["当前项目里需要复盘", "这个规则跨项目也成立"],
+  "rules": ["修改协议前先读真实实现"],
+  "confirmedUnderstanding": ["协议更新必须先和真实实现对齐"],
+  "originalPrompt": "用户要求更新文档",
+  "correctionFeedback": "用户指出我没有先读代码",
+  "finalReply": "已先核对脚本后再修正文档"
+}
+EOF
+```
+
+### PowerShell 示例
+
+```powershell
+@'
+{
+  "entryType": "note",
+  "title": "新增事项要同步刷新记忆",
+  "summary": "记事本条目归档后要同步更新 memory。",
+  "scopeDecision": "project",
+  "scopeReasoning": ["这是当前项目内的实现约束"],
+  "rules": ["新增 note 后同步刷新 memory"],
+  "confirmedUnderstanding": ["记事本和错题都属于统一记忆体系"],
+  "noteReason": "这是长期有效的实现约束",
+  "noteContent": ["归档 note 后同步刷新项目记忆"]
+}
+'@ | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
 ```
 
 ## 记忆原则

@@ -43,6 +43,33 @@ cmd /c mklink /H "$env:USERPROFILE\\.codex\\prompts\\mistakebook.md" "$env:USERP
 
 如果 Skill 已加载，后续当你输入“你这里错了”“重新改”“还没纠正好”等内容时，它会切换到纠错闭环；如果你输入“写入记事本”“记一下这个事项”等内容时，它会进入长期事项记录流程；如果你输入 `/ascended` 或手动要求它按照“见过最有效的方法”来处理，它会升级到飞升模式。
 
+## 快速归档
+
+如果当前仓库里有 `scripts/mistakebook_cli.py`，推荐优先用 stdin 归档：
+
+```bash
+cat <<'EOF' | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+{
+  "entryType": "mistake",
+  "title": "一句话标题",
+  "summary": "一句话总结",
+  "scopeDecision": "project",
+  "scopeReasoning": ["为什么归到这个 scope"],
+  "rules": ["以后必须遵守什么"],
+  "confirmedUnderstanding": ["这次已经吃透了什么"],
+  "originalPrompt": "用户原始问题",
+  "correctionFeedback": "用户的纠错反馈",
+  "finalReply": "修正后的最终回答"
+}
+EOF
+```
+
+`archive` 现在支持三选一：
+
+1. `--payload-file`
+2. `--payload`
+3. `--payload-stdin`
+
 ## 目录
 
 - 项目级存储：`<project>/.codex/mistakebook/`

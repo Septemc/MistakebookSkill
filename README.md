@@ -205,12 +205,92 @@ python scripts/mistakebook_cli.py bootstrap --host codex --project-root .
 
 ```bash
 python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-file payload.json
+python scripts/mistakebook_cli.py archive --host codex --project-root . --payload '{"entryType":"note","title":"...","summary":"..."}'
+python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
 ```
 
-支持：
+归档输入三选一：
+
+1. `--payload-file`
+2. `--payload`
+3. `--payload-stdin`
+
+支持的条目类型：
 
 1. `entryType = mistake`
 2. `entryType = note`
+
+推荐在 Codex 中优先使用 `--payload-stdin`，这样不需要额外写临时 JSON 文件。
+
+#### `mistake` 最小模板
+
+```json
+{
+  "entryType": "mistake",
+  "title": "一句话标题",
+  "summary": "一句话总结",
+  "scopeDecision": "project",
+  "scopeReasoning": ["为什么归到这个 scope"],
+  "rules": ["以后必须遵守什么"],
+  "confirmedUnderstanding": ["这次已经吃透了什么"],
+  "originalPrompt": "用户原始问题",
+  "correctionFeedback": "用户的纠错反馈",
+  "finalReply": "修正后的最终回答"
+}
+```
+
+#### `note` 最小模板
+
+```json
+{
+  "entryType": "note",
+  "title": "一句话标题",
+  "summary": "一句话总结",
+  "scopeDecision": "project",
+  "scopeReasoning": ["为什么归到这个 scope"],
+  "rules": ["以后必须注意什么"],
+  "confirmedUnderstanding": ["这条事项为什么成立"],
+  "noteReason": "为什么值得长期记录",
+  "noteContent": ["这条事项的核心内容"]
+}
+```
+
+#### bash 示例
+
+```bash
+cat <<'EOF' | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+{
+  "entryType": "mistake",
+  "title": "没有先读真实实现",
+  "summary": "修改前没有先核对真实脚本实现。",
+  "scopeDecision": "both",
+  "scopeReasoning": ["当前项目里需要复盘", "这个规则跨项目也成立"],
+  "rules": ["修改协议前先读真实实现"],
+  "confirmedUnderstanding": ["协议更新必须先和真实实现对齐"],
+  "originalPrompt": "用户要求更新文档",
+  "correctionFeedback": "用户指出我没有先读代码",
+  "finalReply": "已先核对脚本后再修正文档"
+}
+EOF
+```
+
+#### PowerShell 示例
+
+```powershell
+@'
+{
+  "entryType": "note",
+  "title": "新增事项要同步刷新记忆",
+  "summary": "记事本条目归档后要同步更新 memory。",
+  "scopeDecision": "project",
+  "scopeReasoning": ["这是当前项目内的实现约束"],
+  "rules": ["新增 note 后同步刷新 memory"],
+  "confirmedUnderstanding": ["记事本和错题都属于统一记忆体系"],
+  "noteReason": "这是长期有效的实现约束",
+  "noteContent": ["归档 note 后同步刷新项目记忆"]
+}
+'@ | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+```
 
 ### 3. 记录命中或检索
 
@@ -243,6 +323,14 @@ python scripts/mistakebook_cli.py status --host codex --project-root . --scope b
 python scripts/mistakebook_cli.py config --auto-detect on
 python scripts/mistakebook_cli.py config --auto-detect off
 ```
+
+### 8. 评估触发规则
+
+```bash
+python scripts/eval_triggers.py
+```
+
+这会直接读取 `hooks/hooks.json` 里的 `UserPromptSubmit` matcher，并对 `evals/trigger-prompts/` 下的样本做回归检查。只要有任一样本不符合预期，脚本就会以非 `0` 退出码结束。
 
 ## 推荐工作流
 

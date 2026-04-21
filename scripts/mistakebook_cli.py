@@ -749,13 +749,28 @@ def refresh_store_memory(
 
 
 def load_payload(args: argparse.Namespace) -> dict[str, Any]:
+    payload_sources = [bool(args.payload_file), bool(args.payload), bool(getattr(args, "payload_stdin", False))]
+    provided_sources = sum(1 for source in payload_sources if source)
+    if provided_sources == 0:
+        raise SystemExit("archive requires exactly one of --payload-file, --payload, or --payload-stdin")
+    if provided_sources > 1:
+        raise SystemExit("archive accepts only one of --payload-file, --payload, or --payload-stdin")
+
     if args.payload_file:
         with Path(args.payload_file).open("r", encoding="utf-8-sig") as handle:
             payload = json.load(handle)
     elif args.payload:
         payload = json.loads(args.payload)
+    elif getattr(args, "payload_stdin", False):
+        raw_payload = sys.stdin.read()
+        if not raw_payload.strip():
+            raise SystemExit("archive received empty stdin payload")
+        try:
+            payload = json.loads(raw_payload.lstrip("\ufeff"))
+        except json.JSONDecodeError as exc:
+            raise SystemExit("archive failed to parse JSON from stdin") from exc
     else:
-        raise SystemExit("archive requires --payload-file or --payload")
+        raise SystemExit("archive requires exactly one of --payload-file, --payload, or --payload-stdin")
 
     if args.entry_type:
         payload["entryType"] = args.entry_type
@@ -1123,6 +1138,7 @@ def build_parser() -> argparse.ArgumentParser:
     archive.add_argument("--entry-type", choices=ENTRY_TYPES)
     archive.add_argument("--payload-file")
     archive.add_argument("--payload")
+    archive.add_argument("--payload-stdin", action="store_true")
     archive.set_defaults(func=archive_command)
 
     consolidate = subparsers.add_parser("consolidate", help="Rebuild cache memories from all mistakes and notes.")

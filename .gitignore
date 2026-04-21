@@ -1,6 +1,6 @@
 # Local reference repository, not part of the distributable project
 reference_code/
-docs/project structure/
+docs/personal/
 
 # Python cache
 __pycache__/
@@ -10,6 +10,7 @@ __pycache__/
 .mistakebook/
 .claude/
 .vscode/mistakebook/
+.vscode/mcp.json
 .codex/mistakebook/
 
 # OS junk
