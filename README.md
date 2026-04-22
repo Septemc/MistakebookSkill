@@ -118,6 +118,38 @@ Agent 会升级到飞升模式。
 9. 当前仓库中和问题相关的真实文件、真实输出、真实文档
 10. 当前 case 的完整纠错链 / 事项链
 
+### 7. 学霸模式
+
+当这是一个新的正常任务，而不是纠错、记事本归档或飞升场景时：
+
+1. 先运行 `scholar`
+2. 只在高置信命中历史案例时，给出一行历史提醒
+
+Agent 会进入学霸模式预检。
+
+进入学霸模式时，Agent 应优先执行：
+
+`python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"`
+
+学霸模式会尽量轻量地完成这些事情：
+
+1. 检索项目级错题集
+2. 检索项目级记事本
+3. 检索项目级记忆
+4. 检索全局级错题集
+5. 检索全局级记事本
+6. 检索全局级记忆
+7. 按字段命中和 memory score 对候选案例排序
+8. 只返回最相关的高置信结果
+9. 只在 `shouldInject = true` 时输出一行 `message`
+10. 不写归档、不刷新 memory、也不增加 retrieval 记账
+
+学霸模式和飞升模式的职责边界：
+
+1. 学霸模式负责答前避错
+2. 飞升模式负责失败后的升级处置
+3. 一旦进入纠错闭环、记事本归档或 `Ascended Mode`，就必须停止运行学霸模式
+
 ## 仓库结构
 
 ```text
@@ -449,35 +481,3 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 `reference_code/` 只是本地参考材料，不属于这个 Skill 项目的正式发布内容。
 
 仓库的 `.gitignore` 已经把它排除掉，避免把参考仓库一并提交进去。
-
-## Scholar Mode
-
-`scholar` 是学霸模式的统一预检入口。它不是飞升模式的替代品，而是在**新任务开始前**先做一次轻量检索，只在高置信命中历史案例时注入一行提醒，帮助 Agent 主动避开重复错误。
-
-它和 `Ascended Mode` 的职责边界是固定的：
-
-1. `scholar` 负责**答前避错**
-2. `Ascended Mode` 负责**失败后的升级处置**
-3. 一旦进入纠错闭环、记事本归档或 `Ascended Mode`，就必须停止运行 `scholar`
-
-学霸模式的典型流程如下：
-
-1. 宿主识别这是一个新的正常任务，而不是纠错或飞升场景
-2. 先执行：
-   `python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"`
-3. 如果返回 `shouldInject = true`，就在正式回答前输出一行 `message`
-4. 如果返回 `shouldInject = false`，保持静默，直接正常回答
-5. 整个预检过程不写归档、不刷新 memory、也不增加 retrieval 记账
-6. 如果后续进入纠错闭环或飞升模式，立即让位给原有主链路
-
-```bash
-python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "先读真实实现再改文档"
-python scripts/mistakebook_cli.py config --scholar on
-python scripts/mistakebook_cli.py config --scholar off
-```
-
-宿主接入说明：
-
-- **Codex**：通过 `/prompts:scholar` 或宿主指令中的新任务预检规则显式触发
-- **Claude 风格宿主**：通过 `UserPromptSubmit` 的轻量 scholar hook 做软自动化提醒，并保留 `commands/scholar.md` 作为显式入口
-- **VSCode Copilot**：通过 `vscode/prompts/scholar.prompt.md` 或 instructions 中的新任务预检规则触发
