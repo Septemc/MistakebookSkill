@@ -9,6 +9,7 @@
 - 首次进入纠错模式时输出固定激活文案
 - 在用户确认后，归档到项目级和全局级错题集或记事本
 - 每次归档都刷新缓存式项目记忆和全局记忆
+- 为 Codex 提供更适合输入框体验的 skill-chip 入口
 
 ## 安装
 
@@ -17,8 +18,16 @@
 ```bash
 git clone <your-repo-url> ~/.codex/mistakebook
 mkdir -p ~/.codex/skills ~/.codex/prompts
+
 ln -s ~/.codex/mistakebook/codex/mistakebook ~/.codex/skills/mistakebook
+ln -s ~/.codex/mistakebook/codex/ascended ~/.codex/skills/ascended
+ln -s ~/.codex/mistakebook/codex/notebook ~/.codex/skills/notebook
+ln -s ~/.codex/mistakebook/codex/scholar ~/.codex/skills/scholar
+
 ln -s ~/.codex/mistakebook/commands/mistakebook.md ~/.codex/prompts/mistakebook.md
+ln -s ~/.codex/mistakebook/commands/ascended.md ~/.codex/prompts/ascended.md
+ln -s ~/.codex/mistakebook/commands/notebook.md ~/.codex/prompts/notebook.md
+ln -s ~/.codex/mistakebook/commands/scholar.md ~/.codex/prompts/scholar.md
 ```
 
 ### Windows (PowerShell)
@@ -27,19 +36,67 @@ ln -s ~/.codex/mistakebook/commands/mistakebook.md ~/.codex/prompts/mistakebook.
 git clone <your-repo-url> "$env:USERPROFILE\\.codex\\mistakebook"
 New-Item -ItemType Directory -Force "$env:USERPROFILE\\.codex\\skills" | Out-Null
 New-Item -ItemType Directory -Force "$env:USERPROFILE\\.codex\\prompts" | Out-Null
+
 cmd /c mklink /J "$env:USERPROFILE\\.codex\\skills\\mistakebook" "$env:USERPROFILE\\.codex\\mistakebook\\codex\\mistakebook"
+cmd /c mklink /J "$env:USERPROFILE\\.codex\\skills\\ascended" "$env:USERPROFILE\\.codex\\mistakebook\\codex\\ascended"
+cmd /c mklink /J "$env:USERPROFILE\\.codex\\skills\\notebook" "$env:USERPROFILE\\.codex\\mistakebook\\codex\\notebook"
+cmd /c mklink /J "$env:USERPROFILE\\.codex\\skills\\scholar" "$env:USERPROFILE\\.codex\\mistakebook\\codex\\scholar"
+
 cmd /c mklink /H "$env:USERPROFILE\\.codex\\prompts\\mistakebook.md" "$env:USERPROFILE\\.codex\\mistakebook\\commands\\mistakebook.md"
+cmd /c mklink /H "$env:USERPROFILE\\.codex\\prompts\\ascended.md" "$env:USERPROFILE\\.codex\\mistakebook\\commands\\ascended.md"
+cmd /c mklink /H "$env:USERPROFILE\\.codex\\prompts\\notebook.md" "$env:USERPROFILE\\.codex\\mistakebook\\commands\\notebook.md"
+cmd /c mklink /H "$env:USERPROFILE\\.codex\\prompts\\scholar.md" "$env:USERPROFILE\\.codex\\mistakebook\\commands\\scholar.md"
 ```
+
+## 推荐入口
+
+在 Codex 中优先使用这些 skill-chip 入口：
+
+- `$mistakebook`
+- `$ascended`
+- `$notebook`
+- `$scholar`
+
+这样可以避免把长 prompt 正文直接展开到输入框里。
+
+## 兼容入口
+
+如果你已经习惯 `/prompts:*`，这些入口仍然保留：
+
+- `/prompts:mistakebook`
+- `/prompts:ascended`
+- `/prompts:notebook`
+- `/prompts:scholar`
+
+## 使用与触发规则
+
+- `$mistakebook`
+  - Codex 默认主入口。先选成 skill chip，再正常提问。
+  - 进入后，用户纠错语会触发 `mistake` 闭环，记事项语会触发 `note` 候选流程。
+  - 同一个案例被否定两次以上，或用户明确要求最强方法时，会升级到 `Ascended Mode`。
+- `$ascended`
+  - 手动强制进入飞升模式。
+  - 适合当前问题已经失败多轮，需要直接全面检索项目级 / 全局级知识后再处理。
+- `$notebook`
+  - 手动进入 `note` 流程。
+  - 适合先整理长期事项，再决定是否归档到记事本。
+- `$scholar`
+  - 新任务答前预检入口。
+  - 只在 `shouldInject = true` 时注入一行历史提醒；如果当前已经进入 `mistake`、`note` 或 `Ascended Mode`，不要再运行它。
+- `/prompts:*`
+  - 兼容入口，语义和对应 skill 一样，但会把 prompt 正文展开到输入框。
+  - 如果你想要 `$pua` 那样的 chip 体验，应该用 `$mistakebook`、`$ascended`、`$notebook`、`$scholar`，不要用 `/prompts:*`。
 
 ## 验证
 
 在 Codex 中输入：
 
 - `$mistakebook`
+- `$ascended`
+- `$notebook`
+- `$scholar`
 - `/prompts:mistakebook`
-- `/prompts:mistakebook note`
-- `/ascended`
-- `你需要根据你见过最有效的方法来处理这个问题`
+- `/prompts:ascended`
 
 如果 Skill 已加载，后续当你输入“你这里错了”“重新改”“还没纠正好”等内容时，它会切换到纠错闭环；如果你输入“写入记事本”“记一下这个事项”等内容时，它会进入长期事项记录流程；如果你输入 `/ascended` 或手动要求它按照“见过最有效的方法”来处理，它会升级到飞升模式。
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "记事本"
+  short_description: "以 Codex skill chip 形式进入 mistakebook 的 note 流程"
+  default_prompt: "Use $notebook to enter Mistakebook note mode for the current task."
+
+policy:
+  allow_implicit_invocation: false

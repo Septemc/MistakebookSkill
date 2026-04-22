@@ -156,7 +156,10 @@ Agent 会进入学霸模式预检。
 .
 ├─ .claude-plugin/              # Claude 风格插件元数据
 ├─ .codex/                      # Codex 安装说明
-├─ codex/mistakebook/           # Codex 精简版 Skill
+├─ codex/ascended/              # Codex 飞升模式 skill-chip 包装入口
+├─ codex/mistakebook/           # Codex 主 skill-chip 入口
+├─ codex/notebook/              # Codex 记事本 skill-chip 包装入口
+├─ codex/scholar/               # Codex scholar skill-chip 包装入口
 ├─ commands/                    # 手动命令入口
 ├─ evals/                       # 触发词回归样例
 ├─ hooks/                       # Claude 风格自动触发 / restore hooks
@@ -180,7 +183,13 @@ Agent 会进入学霸模式预检。
 - [skills/mistakebook/references/ascended-mode.md](./skills/mistakebook/references/ascended-mode.md)
   - 飞升模式协议
 - [codex/mistakebook/SKILL.md](./codex/mistakebook/SKILL.md)
-  - Codex 精简版协议
+  - Codex 主 skill-chip 协议
+- [codex/ascended/SKILL.md](./codex/ascended/SKILL.md)
+  - Codex 飞升模式 skill-chip 包装入口
+- [codex/notebook/SKILL.md](./codex/notebook/SKILL.md)
+  - Codex 记事本 skill-chip 包装入口
+- [codex/scholar/SKILL.md](./codex/scholar/SKILL.md)
+  - Codex scholar skill-chip 包装入口
 - [scripts/mistakebook_cli.py](./scripts/mistakebook_cli.py)
   - 初始化、归档、命中、整理、上下文导出 CLI
 - [commands/mistakebook.md](./commands/mistakebook.md)
@@ -424,13 +433,49 @@ python scripts/eval_triggers.py
 
 Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 
-常用入口：
+推荐入口：
 
 1. `$mistakebook`
-2. `/prompts:mistakebook`
-3. `/prompts:scholar`
-4. `/prompts:notebook`（如果宿主加载了该 prompt）
-5. `/ascended`
+2. `$ascended`
+3. `$notebook`
+4. `$scholar`
+
+这些入口会以 skill chip 形式出现在输入框里，不会把长 prompt 正文直接展开出来。
+
+兼容入口：
+
+1. `/prompts:mistakebook`
+2. `/prompts:ascended`
+3. `/prompts:notebook`
+4. `/prompts:scholar`
+
+使用与触发规则：
+
+- `$mistakebook`
+  - Codex 默认主入口。先把它作为 skill chip 加载，再正常提问。
+  - 加载后，如果用户说“你这里错了”“还没改对”“按我说的改”“我来纠正你”，进入 `mistake` 闭环。
+  - 加载后，如果用户说“写入记事本”“记一下这个事项”“这不是错题，但要记住”，进入 `note` 候选流程。
+  - 同一个案例被明确否定两次以上，或用户明确要求“根据你见过最有效的方法来处理”，升级到 `Ascended Mode`。
+- `$ascended`
+  - 手动强制进入飞升模式，用于当前问题已经失败、返工多轮、或你想直接要求全量检索时。
+  - 它不是普通新任务入口，而是最强处理入口。
+- `$notebook`
+  - 手动进入 `note` 流程，先整理长期事项，再等待用户确认是否写入记事本。
+  - 没有明确确认前，不会归档。
+- `$scholar`
+  - 新任务答前预检入口，只适合 fresh normal task。
+  - 它只在高置信命中历史经验时输出一行提醒；如果 `shouldInject = false`，就静默继续。
+  - 如果当前已经处在 `mistake`、`note` 或 `Ascended Mode`，就不应该再运行它。
+- `/prompts:*`
+  - 兼容入口，语义和上面对应，但它是 prompt 文件，不是 skill chip。
+  - 在 Codex 输入框里会展开 prompt 正文，因此不适合追求 `$pua` 那种紫色 chip 体验。
+
+典型用法：
+
+1. `$mistakebook 帮我看这个改动哪里不稳`
+2. `$ascended 这个问题前面已经反复失败了，重新全面检索后再处理`
+3. `$notebook 把这个长期约束整理一下`
+4. `$scholar 帮我先做答前避错，再给方案`
 
 ### Claude 风格宿主
 

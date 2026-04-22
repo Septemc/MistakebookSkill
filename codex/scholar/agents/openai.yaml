@@ -1,0 +1,7 @@
+interface:
+  display_name: "学霸模式"
+  short_description: "以 Codex skill chip 形式运行 mistakebook 的轻量预检"
+  default_prompt: "Use $scholar to run Mistakebook scholar preflight for a fresh normal task."
+
+policy:
+  allow_implicit_invocation: false

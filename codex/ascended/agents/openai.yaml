@@ -1,0 +1,7 @@
+interface:
+  display_name: "飞升模式"
+  short_description: "以 Codex skill chip 形式进入 mistakebook 的飞升模式"
+  default_prompt: "Use $ascended to enter Mistakebook Ascended Mode for the current task."
+
+policy:
+  allow_implicit_invocation: false
