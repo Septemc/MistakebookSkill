@@ -660,6 +660,21 @@ def query_catalog_entry(entry: dict[str, Any], query_text: str, stale_days: int,
     return result
 
 
+def query_catalog(
+    catalog: list[dict[str, Any]],
+    query_text: str,
+    stale_days: int,
+    store_scope: str,
+) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for entry in catalog:
+        match = query_catalog_entry(entry, query_text, stale_days, store_scope)
+        if match is not None:
+            results.append(match)
+    results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
+    return results
+
+
 def query_store(
     host: str,
     store_scope: str,
@@ -671,13 +686,7 @@ def query_store(
     base = resolve_project_base(host, project_root) if store_scope == "project" else resolve_global_base(host, global_root)
     store = ensure_store(base, store_scope)
     catalog = load_catalog(Path(store["catalog_path"]))
-    results: list[dict[str, Any]] = []
-    for entry in catalog:
-        match = query_catalog_entry(entry, query_text, stale_days, store_scope)
-        if match is not None:
-            results.append(match)
-    results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
-    return results
+    return query_catalog(catalog, query_text, stale_days, store_scope)
 
 
 def select_memory_entries(
@@ -1175,8 +1184,77 @@ def load_scope_context(
     }
 
 
+def annotate_full_scope_context(scope_context: dict[str, Any], limit: int) -> dict[str, Any]:
+    total_entries = len(scope_context["mistakes"]) + len(scope_context["notes"])
+    result = dict(scope_context)
+    result.update(
+        {
+            "pruned": False,
+            "query": "",
+            "limit": limit,
+            "totalEntries": total_entries,
+            "returnedEntries": total_entries,
+        }
+    )
+    return result
+
+
+def load_pruned_scope_context(
+    host: str,
+    store_scope: str,
+    project_root: Path,
+    global_root: str | None,
+    mark_retrieval: bool,
+    threshold: int,
+    stale_days: int,
+    query_text: str,
+    limit: int,
+) -> dict[str, Any]:
+    base = resolve_project_base(host, project_root) if store_scope == "project" else resolve_global_base(host, global_root)
+    store = ensure_store(base, store_scope)
+    catalog_path = Path(store["catalog_path"])
+    catalog = load_catalog(catalog_path)
+    ranked_results = query_catalog(catalog, query_text, stale_days, store_scope)
+    selected_case_ids = [entry["caseId"] for entry in ranked_results[:limit]]
+
+    if mark_retrieval and selected_case_ids:
+        catalog, _ = touch_catalog_entries(catalog, set(selected_case_ids), "retrieval", 1, utc_now())
+        write_catalog(catalog_path, catalog)
+        refresh_store_memory(
+            store_scope,
+            base,
+            threshold,
+            stale_days,
+            reason="Refresh memory after exporting pruned ascended context.",
+        )
+        catalog = load_catalog(catalog_path)
+
+    catalog_by_case_id = {entry["caseId"]: entry for entry in catalog}
+    selected_catalog = [catalog_by_case_id[case_id] for case_id in selected_case_ids if case_id in catalog_by_case_id]
+    memory_markdown = Path(store["memory_path"]).read_text(encoding="utf-8") if Path(store["memory_path"]).exists() else ""
+    memory_state = read_json(Path(store["memory_state_path"]), {})
+    return {
+        "base": str(base),
+        "pruned": True,
+        "query": query_text,
+        "limit": limit,
+        "totalEntries": len(catalog),
+        "returnedEntries": len(selected_catalog),
+        "memoryPath": store["memory_path"],
+        "memoryMarkdown": memory_markdown,
+        "memoryState": memory_state,
+        "mistakes": [entry for entry in selected_catalog if entry.get("entryType") == "mistake"],
+        "notes": [entry for entry in selected_catalog if entry.get("entryType") == "note"],
+    }
+
+
 def context_command(args: argparse.Namespace) -> int:
     project_root = Path(args.project_root).resolve()
+    query_text = str(args.query or "").strip()
+    if args.query is not None and not query_text:
+        raise SystemExit("context requires non-empty --query")
+    if args.limit < 1:
+        raise SystemExit("context requires --limit >= 1")
     result: dict[str, Any] = {
         "host": args.host,
         "scope": args.scope,
@@ -1185,25 +1263,57 @@ def context_command(args: argparse.Namespace) -> int:
         "goal": "为飞升模式导出项目级/全局级错题、记事本与缓存记忆上下文",
     }
     if args.scope in {"project", "both"}:
-        result["project"] = load_scope_context(
-            args.host,
-            "project",
-            project_root,
-            args.global_root,
-            args.mark_retrieval,
-            args.memory_threshold,
-            args.stale_days,
-        )
+        if query_text:
+            result["project"] = load_pruned_scope_context(
+                args.host,
+                "project",
+                project_root,
+                args.global_root,
+                args.mark_retrieval,
+                args.memory_threshold,
+                args.stale_days,
+                query_text,
+                args.limit,
+            )
+        else:
+            result["project"] = annotate_full_scope_context(
+                load_scope_context(
+                    args.host,
+                    "project",
+                    project_root,
+                    args.global_root,
+                    args.mark_retrieval,
+                    args.memory_threshold,
+                    args.stale_days,
+                ),
+                args.limit,
+            )
     if args.scope in {"global", "both"}:
-        result["global"] = load_scope_context(
-            args.host,
-            "global",
-            project_root,
-            args.global_root,
-            args.mark_retrieval,
-            args.memory_threshold,
-            args.stale_days,
-        )
+        if query_text:
+            result["global"] = load_pruned_scope_context(
+                args.host,
+                "global",
+                project_root,
+                args.global_root,
+                args.mark_retrieval,
+                args.memory_threshold,
+                args.stale_days,
+                query_text,
+                args.limit,
+            )
+        else:
+            result["global"] = annotate_full_scope_context(
+                load_scope_context(
+                    args.host,
+                    "global",
+                    project_root,
+                    args.global_root,
+                    args.mark_retrieval,
+                    args.memory_threshold,
+                    args.stale_days,
+                ),
+                args.limit,
+            )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
@@ -1329,6 +1439,8 @@ def build_parser() -> argparse.ArgumentParser:
     add_memory_policy_args(context)
     context.add_argument("--scope", choices=("project", "global", "both"), default="both")
     context.add_argument("--mark-retrieval", action="store_true")
+    context.add_argument("--query")
+    context.add_argument("--limit", type=int, default=3)
     context.set_defaults(func=context_command)
 
     query = subparsers.add_parser("query", help="Search archived mistakes and notes with lexical match + memory score.")

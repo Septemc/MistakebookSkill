@@ -317,6 +317,7 @@ python scripts/mistakebook_cli.py consolidate --host codex --project-root . --sc
 
 ```bash
 python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
+python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --query "鍏堣鐪熷疄瀹炵幇鍐嶆敼鏂囨。" --limit 3 --mark-retrieval
 ```
 
 ### 7. 查看状态
