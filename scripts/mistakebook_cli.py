@@ -550,6 +550,136 @@ def compute_entry_score(entry: dict[str, Any], now: datetime, stale_days: int) -
     return decorated
 
 
+QUERY_FIELD_WEIGHTS: dict[str, float] = {
+    "title": 4.5,
+    "summary": 3.5,
+    "keywords": 3.5,
+    "rules": 3.0,
+    "confirmedUnderstanding": 2.5,
+    "whatWentWrong": 2.0,
+    "preventionChecklist": 2.0,
+    "noteContent": 2.5,
+    "noteActionItems": 2.0,
+    "noteReason": 1.8,
+    "noteContext": 1.2,
+    "projectMemoryDelta": 1.5,
+    "globalMemoryDelta": 1.5,
+}
+
+
+def normalize_query_text(text: Any) -> str:
+    return re.sub(r"\s+", " ", str(text or "").strip().lower())
+
+
+def extract_query_terms(text: str, limit: int = 24) -> list[str]:
+    normalized = normalize_query_text(text)
+    terms: set[str] = set()
+    for segment in re.findall(r"[a-z0-9_+-]+|[\u4e00-\u9fff]+", normalized):
+        if not segment:
+            continue
+        if re.fullmatch(r"[a-z0-9_+-]+", segment):
+            if len(segment) >= 2:
+                terms.add(segment)
+            continue
+        terms.add(segment)
+        for size in (4, 3, 2):
+            if len(segment) < size:
+                continue
+            for index in range(len(segment) - size + 1):
+                terms.add(segment[index : index + size])
+    ordered = sorted(terms, key=lambda item: (-len(item), item))
+    return ordered[:limit]
+
+
+def build_query_field_values(entry: dict[str, Any]) -> dict[str, list[str]]:
+    normalized = normalize_catalog_entry(entry)
+    field_values: dict[str, list[str]] = {}
+    for field in QUERY_FIELD_WEIGHTS:
+        value = normalized.get(field)
+        if isinstance(value, list):
+            field_values[field] = [normalize_query_text(item) for item in value if normalize_query_text(item)]
+        else:
+            text = normalize_query_text(value)
+            field_values[field] = [text] if text else []
+    return field_values
+
+
+def query_catalog_entry(entry: dict[str, Any], query_text: str, stale_days: int, store_scope: str) -> dict[str, Any] | None:
+    normalized_query = normalize_query_text(query_text)
+    terms = extract_query_terms(normalized_query)
+    if not normalized_query:
+        return None
+
+    decorated = compute_entry_score(entry, datetime.now(timezone.utc), stale_days)
+    field_values = build_query_field_values(decorated)
+    matched_terms: list[str] = []
+    match_reasons: list[str] = []
+    lexical_score = 0.0
+    any_match = False
+
+    for field, weight in QUERY_FIELD_WEIGHTS.items():
+        values = field_values.get(field, [])
+        if not values:
+            continue
+        query_hit = any(normalized_query in value for value in values)
+        term_hits = [term for term in terms if any(term in value for value in values)]
+        if not query_hit and not term_hits:
+            continue
+        any_match = True
+        field_score = weight * (1.6 if query_hit else 1.0 + 0.15 * min(len(term_hits), 3))
+        lexical_score += field_score
+        if query_hit:
+            match_reasons.append(f"{field}:query")
+            matched_terms.append(normalized_query)
+        elif term_hits:
+            match_reasons.append(f"{field}:{','.join(term_hits[:3])}")
+        matched_terms.extend(term_hits[:4])
+
+    if not any_match:
+        return None
+
+    unique_terms = unique_items(matched_terms, limit=12)
+    unique_reasons = unique_items(match_reasons, limit=8)
+    result = {
+        "storeScope": store_scope,
+        "caseId": decorated["caseId"],
+        "entryType": decorated["entryType"],
+        "title": decorated["title"],
+        "summary": decorated["summary"],
+        "relativePath": decorated["relativePath"],
+        "scopeDecision": decorated["scopeDecision"],
+        "archivedAt": decorated["archivedAt"],
+        "score": round(decorated["_memoryScore"] + lexical_score, 4),
+        "memoryScore": decorated["_memoryScore"],
+        "matchedTerms": unique_terms,
+        "matchReasons": unique_reasons,
+        "keywords": decorated["keywords"],
+        "hitCount": decorated["hitCount"],
+        "retrievalCount": decorated["retrievalCount"],
+    }
+    return result
+
+
+def query_store(
+    host: str,
+    store_scope: str,
+    project_root: Path,
+    global_root: str | None,
+    query_text: str,
+    stale_days: int,
+) -> list[dict[str, Any]]:
+    base = resolve_project_base(host, project_root) if store_scope == "project" else resolve_global_base(host, global_root)
+    store = ensure_store(base, store_scope)
+    catalog = load_catalog(Path(store["catalog_path"]))
+    results: list[dict[str, Any]] = []
+    for entry in catalog:
+        match = query_catalog_entry(entry, query_text, stale_days, store_scope)
+        if match is not None:
+            results.append(match)
+    results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
+    return results
+
+
 def select_memory_entries(
     catalog: list[dict[str, Any]],
     threshold: int,
@@ -1078,6 +1208,42 @@ def context_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def query_command(args: argparse.Namespace) -> int:
+    project_root = Path(args.project_root).resolve()
+    query_text = str(args.text or "").strip()
+    if not query_text:
+        raise SystemExit("query requires non-empty --text")
+    if args.limit < 1:
+        raise SystemExit("query requires --limit >= 1")
+
+    combined_results: list[dict[str, Any]] = []
+    for store_scope in ("project", "global"):
+        if args.scope not in {store_scope, "both"}:
+            continue
+        combined_results.extend(
+            query_store(
+                args.host,
+                store_scope,
+                project_root,
+                args.global_root,
+                query_text,
+                args.stale_days,
+            )
+        )
+
+    combined_results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
+    result = {
+        "host": args.host,
+        "scope": args.scope,
+        "query": query_text,
+        "limit": args.limit,
+        "generatedAt": utc_now(),
+        "results": combined_results[: args.limit],
+    }
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def status_command(args: argparse.Namespace) -> int:
     project_root = Path(args.project_root).resolve()
     result: dict[str, Any] = {
@@ -1164,6 +1330,14 @@ def build_parser() -> argparse.ArgumentParser:
     context.add_argument("--scope", choices=("project", "global", "both"), default="both")
     context.add_argument("--mark-retrieval", action="store_true")
     context.set_defaults(func=context_command)
+
+    query = subparsers.add_parser("query", help="Search archived mistakes and notes with lexical match + memory score.")
+    add_common_location_args(query)
+    query.add_argument("--scope", choices=("project", "global", "both"), default="both")
+    query.add_argument("--text", required=True)
+    query.add_argument("--limit", type=int, default=3)
+    query.add_argument("--stale-days", type=int, default=DEFAULT_STALE_DAYS)
+    query.set_defaults(func=query_command)
 
     status = subparsers.add_parser("status", help="Show config and store summary.")
     add_common_location_args(status)

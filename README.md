@@ -292,39 +292,47 @@ EOF
 '@ | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
 ```
 
-### 3. 记录命中或检索
+### 3. 统一检索接口
+
+```bash
+python scripts/mistakebook_cli.py query --host codex --project-root . --scope both --text "先读真实实现再改文档" --limit 3
+```
+
+`query` 会从 project / global 的 `catalog` 中找出与当前问题最相关的 Top-N 条目，先用字段命中做召回，再叠加现有 memory score 做排序。它是后续学霸模式和飞升模式裁剪的统一底座。
+
+### 4. 记录命中或检索
 
 ```bash
 python scripts/mistakebook_cli.py touch --host codex --project-root . --scope both --case-id <case-id> --kind hit
 python scripts/mistakebook_cli.py touch --host codex --project-root . --scope both --case-id <case-id> --kind retrieval
 ```
 
-### 4. 重写缓存记忆
+### 5. 重写缓存记忆
 
 ```bash
 python scripts/mistakebook_cli.py consolidate --host codex --project-root . --scope both
 ```
 
-### 5. 导出飞升模式上下文
+### 6. 导出飞升模式上下文
 
 ```bash
 python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
 ```
 
-### 6. 查看状态
+### 7. 查看状态
 
 ```bash
 python scripts/mistakebook_cli.py status --host codex --project-root . --scope both
 ```
 
-### 7. 自动识别开关
+### 8. 自动识别开关
 
 ```bash
 python scripts/mistakebook_cli.py config --auto-detect on
 python scripts/mistakebook_cli.py config --auto-detect off
 ```
 
-### 8. 评估触发规则
+### 9. 评估触发规则
 
 ```bash
 python scripts/eval_triggers.py
