@@ -27,7 +27,10 @@ GLOBAL_ROOTS = {
 CONFIG_PATH = Path("~/.mistakebook/config.json").expanduser()
 DEFAULT_MEMORY_THRESHOLD = 12
 DEFAULT_STALE_DAYS = 45
+DEFAULT_AUTO_DETECT = True
+DEFAULT_SCHOLAR = True
 ENTRY_TYPES = ("mistake", "note")
+SCHOLAR_PHASES = ("normal", "correction", "ascended")
 
 
 def utc_now() -> str:
@@ -156,6 +159,17 @@ def resolve_project_base(host: str, project_root: Path) -> Path:
 def resolve_global_base(host: str, override: str | None) -> Path:
     root = override if override else GLOBAL_ROOTS[host]
     return Path(root).expanduser()
+
+
+def normalize_config(config: dict[str, Any] | None) -> dict[str, Any]:
+    payload = dict(config or {})
+    payload["auto_detect"] = ensure_bool(payload.get("auto_detect"), DEFAULT_AUTO_DETECT)
+    payload["scholar"] = ensure_bool(payload.get("scholar"), DEFAULT_SCHOLAR)
+    return payload
+
+
+def load_config() -> dict[str, Any]:
+    return normalize_config(read_json(CONFIG_PATH, {}))
 
 
 def seed_index(scope_label: str, entry_type: str) -> str:
@@ -687,6 +701,84 @@ def query_store(
     store = ensure_store(base, store_scope)
     catalog = load_catalog(Path(store["catalog_path"]))
     return query_catalog(catalog, query_text, stale_days, store_scope)
+
+
+def trim_scholar_hint(text: Any, limit: int = 80) -> str:
+    normalized = re.sub(r"\s+", " ", str(text or "").strip())
+    normalized = normalized.rstrip("。.!?;；：:，,")
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 3].rstrip() + "..."
+
+
+def build_scholar_guidance(entry: dict[str, Any]) -> str:
+    candidates = (
+        ensure_list(entry.get("rules"))
+        + ensure_list(entry.get("confirmedUnderstanding"))
+        + ensure_list(entry.get("noteContent"))
+    )
+    if not candidates:
+        candidates = ensure_list(entry.get("summary"))
+    return trim_scholar_hint(candidates[0] if candidates else "")
+
+
+def build_scholar_message(entry: dict[str, Any]) -> str:
+    title = trim_scholar_hint(entry.get("title"), limit=48)
+    guidance = build_scholar_guidance(entry)
+    if not guidance:
+        return f'历史提醒：这个任务和“{title}”高度相关，这次先复用这条经验。'
+    if guidance.startswith(("先", "先把", "优先", "避免", "检查", "确认")):
+        return f'历史提醒：这个任务和“{title}”高度相关，这次{guidance}。'
+    return f'历史提醒：这个任务和“{title}”高度相关，这次先{guidance}。'
+
+
+def classify_scholar_confidence(results: list[dict[str, Any]]) -> str:
+    if not results:
+        return "none"
+    top_result = results[0]
+    second_score = results[1]["score"] if len(results) > 1 else 0.0
+    score_gap = top_result["score"] - second_score
+    direct_query_match = any(reason.endswith(":query") for reason in top_result["matchReasons"])
+    strong_support = len(top_result["matchReasons"]) >= 2 or len(top_result["matchedTerms"]) >= 2
+    dense_lexical_match = len(top_result["matchedTerms"]) >= 3
+
+    if (
+        top_result["score"] >= 12.0
+        and strong_support
+        and (direct_query_match or dense_lexical_match)
+        and (len(results) == 1 or score_gap >= 1.5)
+    ):
+        return "high"
+    if top_result["score"] >= 8.0 and (direct_query_match or strong_support):
+        return "medium"
+    if top_result["score"] >= 6.0:
+        return "low"
+    return "none"
+
+
+def collect_scholar_results(
+    host: str,
+    scope: str,
+    project_root: Path,
+    global_root: str | None,
+    query_text: str,
+    stale_days: int,
+) -> tuple[list[dict[str, Any]], dict[tuple[str, str], dict[str, Any]]]:
+    combined_results: list[dict[str, Any]] = []
+    entry_lookup: dict[tuple[str, str], dict[str, Any]] = {}
+
+    for store_scope in ("project", "global"):
+        if scope not in {store_scope, "both"}:
+            continue
+        base = resolve_project_base(host, project_root) if store_scope == "project" else resolve_global_base(host, global_root)
+        store = ensure_store(base, store_scope)
+        catalog = load_catalog(Path(store["catalog_path"]))
+        for entry in catalog:
+            entry_lookup[(store_scope, entry["caseId"])] = entry
+        combined_results.extend(query_catalog(catalog, query_text, stale_days, store_scope))
+
+    combined_results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
+    return combined_results, entry_lookup
 
 
 def select_memory_entries(
@@ -1354,11 +1446,83 @@ def query_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def scholar_command(args: argparse.Namespace) -> int:
+    project_root = Path(args.project_root).resolve()
+    query_text = str(args.text or "").strip()
+    if not query_text:
+        raise SystemExit("scholar requires non-empty --text")
+    if args.limit < 1:
+        raise SystemExit("scholar requires --limit >= 1")
+
+    config = load_config()
+    result: dict[str, Any] = {
+        "host": args.host,
+        "scope": args.scope,
+        "query": query_text,
+        "limit": args.limit,
+        "phase": args.phase,
+        "generatedAt": utc_now(),
+        "enabled": config["scholar"],
+        "shouldInject": False,
+        "confidence": "none",
+        "reason": "",
+        "message": "",
+        "matchedCaseIds": [],
+        "results": [],
+    }
+
+    if not config["scholar"]:
+        result["reason"] = "disabled"
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if args.phase != "normal":
+        result["reason"] = "phase_blocked"
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    combined_results, entry_lookup = collect_scholar_results(
+        args.host,
+        args.scope,
+        project_root,
+        args.global_root,
+        query_text,
+        args.stale_days,
+    )
+    confidence = classify_scholar_confidence(combined_results)
+    result["confidence"] = confidence
+    result["results"] = combined_results[: args.limit]
+
+    if not combined_results:
+        result["reason"] = "no_match"
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    if confidence != "high":
+        result["reason"] = "low_confidence"
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    top_result = combined_results[0]
+    top_entry = entry_lookup.get((top_result["storeScope"], top_result["caseId"]))
+    if top_entry is None:
+        result["reason"] = "missing_entry"
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    result["shouldInject"] = True
+    result["reason"] = "inject"
+    result["message"] = build_scholar_message(top_entry)
+    result["matchedCaseIds"] = [top_result["caseId"]]
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def status_command(args: argparse.Namespace) -> int:
     project_root = Path(args.project_root).resolve()
     result: dict[str, Any] = {
         "host": args.host,
-        "config": read_json(CONFIG_PATH, {}),
+        "config": load_config(),
         "runtimeJournalExists": Path("~/.mistakebook/runtime-journal.md").expanduser().exists(),
     }
     for store_scope in ("project", "global"):
@@ -1380,8 +1544,14 @@ def status_command(args: argparse.Namespace) -> int:
 
 
 def config_command(args: argparse.Namespace) -> int:
-    config = read_json(CONFIG_PATH, {})
-    config["auto_detect"] = args.auto_detect == "on"
+    if args.auto_detect is None and args.scholar is None:
+        raise SystemExit("config requires at least one of --auto-detect or --scholar")
+
+    config = load_config()
+    if args.auto_detect is not None:
+        config["auto_detect"] = args.auto_detect == "on"
+    if args.scholar is not None:
+        config["scholar"] = args.scholar == "on"
     config["updatedAt"] = utc_now()
     write_json(CONFIG_PATH, config)
     print(json.dumps(config, ensure_ascii=False, indent=2))
@@ -1451,13 +1621,23 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--stale-days", type=int, default=DEFAULT_STALE_DAYS)
     query.set_defaults(func=query_command)
 
+    scholar = subparsers.add_parser("scholar", help="Run lightweight preflight retrieval for scholar mode.")
+    add_common_location_args(scholar)
+    scholar.add_argument("--scope", choices=("project", "global", "both"), default="both")
+    scholar.add_argument("--text", required=True)
+    scholar.add_argument("--limit", type=int, default=3)
+    scholar.add_argument("--stale-days", type=int, default=DEFAULT_STALE_DAYS)
+    scholar.add_argument("--phase", choices=SCHOLAR_PHASES, default="normal")
+    scholar.set_defaults(func=scholar_command)
+
     status = subparsers.add_parser("status", help="Show config and store summary.")
     add_common_location_args(status)
     status.add_argument("--scope", choices=("project", "global", "both"), default="both")
     status.set_defaults(func=status_command)
 
     config = subparsers.add_parser("config", help="Update mistakebook config.")
-    config.add_argument("--auto-detect", choices=("on", "off"), required=True)
+    config.add_argument("--auto-detect", choices=("on", "off"))
+    config.add_argument("--scholar", choices=("on", "off"))
     config.set_defaults(func=config_command)
 
     return parser

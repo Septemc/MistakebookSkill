@@ -21,6 +21,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scholar-preflight-trigger.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreCompact": [

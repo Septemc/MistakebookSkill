@@ -213,3 +213,19 @@ EOF
 2. 不要只记录“错在哪里”，也要记录“已经吃透什么”
 3. 不要把项目私有细节原样塞进全局记忆
 4. 不要把暂时遗忘理解成删除详细条目
+## Scholar Preflight
+
+鍦ㄦ柊鐨勬櫘閫氫换鍔″紑濮嬪墠锛屽鏋滃綋鍓嶄笉鍦ㄧ籂閿欓棴鐜垨 Ascended Mode 閲岋紝鍏堣繍琛岋細
+
+```bash
+python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"
+```
+
+鍙湁褰?`shouldInject = true` 鏃讹紝鎵嶅湪姝ｅ紡鍥炵瓟鍓嶈緭鍑轰竴琛屽巻鍙叉彁閱掋€傚鏋滆繘鍏ョ籂閿欓棴鐜垨 `ascended`锛屽氨鍋滄杩愯 `scholar`锛屼笉瑕佽瀛︿緵妯″紡鍜岄鍗囨ā寮忔姠鍚屼竴涓椂鏈恒€?
+
+濡傛灉鐢ㄦ埛璇?`scholar off` / `scholar on`锛屽彲浠ュ湪褰撳墠浼氳瘽涓存椂鍏抽棴鎴栨仮澶嶉妫€銆傚鏋滅敤鎴疯姹傞暱鏈熷叧闂垨寮€鍚紝鎵ц锛?
+
+```bash
+python scripts/mistakebook_cli.py config --scholar off
+python scripts/mistakebook_cli.py config --scholar on
+```

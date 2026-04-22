@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "mistakebook",
-      "description": "错题集 / 记事本 Skill for Claude-style plugin hosts. Includes automatic correction detection hooks, notebook capture hints, Ascended Mode escalation, session restore, manual /mistakebook / notebook / ascended routing, detailed entry archiving, and project/global cache-memory refresh.",
+      "description": "错题集 / 记事本 Skill for Claude-style plugin hosts. Includes lightweight scholar preflight on fresh tasks, automatic correction detection hooks, notebook capture hints, Ascended Mode escalation, session restore, manual /mistakebook / notebook / ascended routing, detailed entry archiving, and project/global cache-memory refresh.",
       "version": "1.0.0",
       "source": "./",
       "author": {

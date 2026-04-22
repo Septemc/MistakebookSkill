@@ -1,6 +1,6 @@
 ---
 description: "错题集 / 记事本 Skill。/mistakebook [on|off|status|consolidate|ascended|note|任务描述]。识别用户纠错状态或主动记录事项，统一归档到项目/全局错题集与记事本，并刷新缓存式记忆；当普通修补不够时，升级到飞升模式（Ascended Mode）。"
-argument-hint: "[on|off|status|consolidate|ascended|note]"
+argument-hint: "[on|off|status|consolidate|ascended|note|scholar-on|scholar-off|scholar-status]"
 ---
 
 根据参数执行以下路由：
@@ -23,6 +23,17 @@ argument-hint: "[on|off|status|consolidate|ascended|note]"
 - **status**
   - 如果存在 `scripts/mistakebook_cli.py`，执行：
     - `python scripts/mistakebook_cli.py status --host codex --project-root . --scope both`
+- **scholar-on**
+  - 如果存在 `scripts/mistakebook_cli.py`，执行：
+    - `python scripts/mistakebook_cli.py config --scholar on`
+  - 输出确认：`> [Scholar ON] 已开启学霸模式预检。`
+- **scholar-off**
+  - 如果存在 `scripts/mistakebook_cli.py`，执行：
+    - `python scripts/mistakebook_cli.py config --scholar off`
+  - 输出确认：`> [Scholar OFF] 已关闭学霸模式预检。`
+- **scholar-status**
+  - 如果存在 `scripts/mistakebook_cli.py`，执行：
+    - `python scripts/mistakebook_cli.py status --host codex --project-root . --scope both`
 - **consolidate**
   - 如果存在 `scripts/mistakebook_cli.py`，执行：
     - `python scripts/mistakebook_cli.py consolidate --host codex --project-root . --scope both`
@@ -38,3 +49,7 @@ argument-hint: "[on|off|status|consolidate|ascended|note]"
 2. 用户没有明确确认前，禁止提前把当前案例归档为 `mistake` 或 `note`
 3. `consolidate` 不是简单追加条目，而是重读相关条目后做去重、合并、压缩和暂时遗忘
 4. `ascended` 不是普通继续修补，而是显式要求你调用当前已知最有效的方法，全面检索项目级 / 全局级知识来源后再给出方案
+5. 对于新的普通任务，如果当前不在纠错闭环、`note` 流程或 `ascended` 流程里，且学霸模式未被关闭，先执行：
+   `python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"`
+6. 只有当 `scholar` 返回 `shouldInject = true` 时，才允许在正式回答前输出一行历史提醒；否则保持静默
+7. 一旦进入纠错闭环或 Ascended Mode，就停止运行 `scholar`，不要让学霸模式和飞升模式争抢同一个时机

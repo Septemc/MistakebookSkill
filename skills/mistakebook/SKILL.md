@@ -336,3 +336,21 @@ python scripts/mistakebook_cli.py context --host codex --project-root . --scope 
 4. 不要让记忆变成流水账；记忆只保留高密度、可执行内容
 5. 不要把“暂时遗忘”理解成“删除详细条目”
 6. 不要进入飞升模式后只看缓存，不看详细错题和记事本
+## Scholar Preflight
+
+鍦ㄦ柊鐨勬櫘閫氫换鍔″紑濮嬪墠锛屽鏋滃綋鍓嶄笉鍦?`mistake` 绾犻敊闂幆銆?`note` 娴佺▼鎴?`ascended` 妯″紡閲岋紝鍏堣繍琛岃交閲忛妫€锛?
+
+```bash
+python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"
+```
+
+鎵ц瑙勫垯锛?
+
+1. 鍙湁褰?`scholar` 杩斿洖 `shouldInject = true` 鏃讹紝鎵嶅湪姝ｅ紡鍥炵瓟鍓嶈緭鍑轰竴琛屽巻鍙叉彁閱?2. 濡傛灉杩斿洖 `shouldInject = false`锛屽繀椤婚潤榛橈紝涓嶈鎶?query 缁撴灉鍘熸牱灞曠ず缁欑敤鎴?3. 涓€鏃﹁繘鍏ョ籂閿欓棴鐜垨 Ascended Mode锛屽氨鍋滄杩愯 `scholar`
+4. `scholar` 鐨勮亴璐ｆ槸鈥滃洖绛斿墠閬块敊鈥濓紝`ascended` 鐨勮亴璐ｆ槸鈥滃け璐ュ悗鍗囩骇澶勭疆鈥濓紝涓よ€呬笉鑳芥贩鍚堟垚鍚屼竴涓噸妯″紡
+5. 濡傛灉鐢ㄦ埛璇?`scholar off` 或 `scholar on`锛屽彲浠ュ湪褰撳墠浼氳瘽涓存椂鍏抽棴鎴栨仮澶嶉妫€锛涘鏋滅敤鎴疯姹傞暱鏈熷叧闂垨寮€鍚紝鍐嶆墽琛岋細
+
+```bash
+python scripts/mistakebook_cli.py config --scholar off
+python scripts/mistakebook_cli.py config --scholar on
+```

@@ -153,10 +153,14 @@ Agent 会升级到飞升模式。
   - 初始化、归档、命中、整理、上下文导出 CLI
 - [commands/mistakebook.md](./commands/mistakebook.md)
   - `/mistakebook` 统一入口
+- [commands/scholar.md](./commands/scholar.md)
+  - 学霸模式手动入口
 - [commands/notebook.md](./commands/notebook.md)
   - 记事本手动入口
 - [commands/ascended.md](./commands/ascended.md)
   - 飞升模式手动入口
+- [hooks/scholar-preflight-trigger.sh](./hooks/scholar-preflight-trigger.sh)
+  - Claude 风格宿主的 scholar 轻量预检 hook
 
 ## 存储结构
 
@@ -392,8 +396,9 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 
 1. `$mistakebook`
 2. `/prompts:mistakebook`
-3. `/prompts:notebook`（如果宿主加载了该 prompt）
-4. `/ascended`
+3. `/prompts:scholar`
+4. `/prompts:notebook`（如果宿主加载了该 prompt）
+5. `/ascended`
 
 ### Claude 风格宿主
 
@@ -401,9 +406,10 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 
 1. `.claude-plugin/plugin.json`
 2. `commands/mistakebook.md`
-3. `commands/notebook.md`
-4. `commands/ascended.md`
-5. `hooks/hooks.json`
+3. `commands/scholar.md`
+4. `commands/notebook.md`
+5. `commands/ascended.md`
+6. `hooks/hooks.json`
 
 ### VSCode Copilot
 
@@ -412,8 +418,9 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 1. [vscode/copilot-instructions.md](./vscode/copilot-instructions.md)
 2. [vscode/instructions/mistakebook.instructions.md](./vscode/instructions/mistakebook.instructions.md)
 3. [vscode/prompts/mistakebook.prompt.md](./vscode/prompts/mistakebook.prompt.md)
-4. [vscode/prompts/notebook.prompt.md](./vscode/prompts/notebook.prompt.md)
-5. [vscode/prompts/ascended.prompt.md](./vscode/prompts/ascended.prompt.md)
+4. [vscode/prompts/scholar.prompt.md](./vscode/prompts/scholar.prompt.md)
+5. [vscode/prompts/notebook.prompt.md](./vscode/prompts/notebook.prompt.md)
+6. [vscode/prompts/ascended.prompt.md](./vscode/prompts/ascended.prompt.md)
 
 ## 当前已经实现
 
@@ -442,3 +449,35 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 `reference_code/` 只是本地参考材料，不属于这个 Skill 项目的正式发布内容。
 
 仓库的 `.gitignore` 已经把它排除掉，避免把参考仓库一并提交进去。
+
+## Scholar Mode
+
+`scholar` 是学霸模式的统一预检入口。它不是飞升模式的替代品，而是在**新任务开始前**先做一次轻量检索，只在高置信命中历史案例时注入一行提醒，帮助 Agent 主动避开重复错误。
+
+它和 `Ascended Mode` 的职责边界是固定的：
+
+1. `scholar` 负责**答前避错**
+2. `Ascended Mode` 负责**失败后的升级处置**
+3. 一旦进入纠错闭环、记事本归档或 `Ascended Mode`，就必须停止运行 `scholar`
+
+学霸模式的典型流程如下：
+
+1. 宿主识别这是一个新的正常任务，而不是纠错或飞升场景
+2. 先执行：
+   `python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"`
+3. 如果返回 `shouldInject = true`，就在正式回答前输出一行 `message`
+4. 如果返回 `shouldInject = false`，保持静默，直接正常回答
+5. 整个预检过程不写归档、不刷新 memory、也不增加 retrieval 记账
+6. 如果后续进入纠错闭环或飞升模式，立即让位给原有主链路
+
+```bash
+python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "先读真实实现再改文档"
+python scripts/mistakebook_cli.py config --scholar on
+python scripts/mistakebook_cli.py config --scholar off
+```
+
+宿主接入说明：
+
+- **Codex**：通过 `/prompts:scholar` 或宿主指令中的新任务预检规则显式触发
+- **Claude 风格宿主**：通过 `UserPromptSubmit` 的轻量 scholar hook 做软自动化提醒，并保留 `commands/scholar.md` 作为显式入口
+- **VSCode Copilot**：通过 `vscode/prompts/scholar.prompt.md` 或 instructions 中的新任务预检规则触发
