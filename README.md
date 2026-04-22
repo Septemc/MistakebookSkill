@@ -1,6 +1,6 @@
 # Mistakebook Skill
 
-错题集 / 记事本 Skill。它的目标不是单纯“认错”，而是把 Agent 的纠错、长期注意事项、项目记忆、全局记忆和飞升模式检索，变成一套真正可落地的工作流。
+错题集.Skill。我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了! / I have done tens of thousands of practice problems, and I have summarized a vast amount of wrong answers. Now, I am invincible.
 
 ![](docs/assets/825b6024898386ec7ccef3496b3efe26.jpg)
 
