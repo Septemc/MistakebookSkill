@@ -94,7 +94,7 @@ class MistakebookCliScholarTests(unittest.TestCase):
             self.assertEqual(len(output["matchedCaseIds"]), 1)
             self.assertTrue(output["results"])
 
-            catalog_path = Path(project_root) / ".codex" / "mistakebook" / "state" / "catalog.json"
+            catalog_path = Path(project_root) / ".mistakebook" / "state" / "catalog.json"
             catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
             counts = {entry["title"]: entry.get("retrievalCount", 0) for entry in catalog}
             self.assertEqual(counts["verify-real-implementation"], 4)

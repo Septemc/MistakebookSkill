@@ -221,18 +221,14 @@ MistakebookSkill/
 
 #### `scripts/mistakebook_cli.py` 维护的目录约定
 
-根据脚本常量定义：
+所有 Agent 工具共享统一的存储路径：
 
-1. 项目级默认根目录
-   - Codex：`.codex/mistakebook`
-   - Claude：`.claude/mistakebook`
-   - VSCode：`.vscode/mistakebook`
-   - Generic：`.mistakebook`
-2. 全局级默认根目录
-   - Codex：`~/.codex/mistakebook`
-   - Claude：`~/.claude/mistakebook`
-   - VSCode：`~/.vscode/mistakebook`
-   - Generic：`~/.mistakebook`
+1. 项目级默认根目录：`.mistakebook`
+2. 全局级默认根目录：`~/.mistakebook`
+
+旧版路径（已废弃，会自动迁移到统一路径）：
+- `.codex/mistakebook`、`.claude/mistakebook`、`.vscode/mistakebook`
+- `~/.codex/mistakebook`、`~/.claude/mistakebook`、`~/.vscode/mistakebook`
 
 ### 4.10 `skills/mistakebook/`
 
@@ -307,14 +303,8 @@ MistakebookSkill/
 这些内容是执行过程中可能产生的本地数据：
 
 1. `scripts/__pycache__/`
-2. `<project>/.codex/mistakebook/`
-3. `<project>/.claude/mistakebook/`
-4. `<project>/.vscode/mistakebook/`
-5. `~/.codex/mistakebook/`
-6. `~/.claude/mistakebook/`
-7. `~/.vscode/mistakebook/`
-8. `~/.mistakebook/config.json`
-9. `~/.mistakebook/runtime-journal.md`
+2. `<project>/.mistakebook/`
+3. `~/.mistakebook/`
 
 ## 6. Claude 的实际安装过程
 
@@ -415,23 +405,16 @@ Claude 风格宿主真正会关心的文件链路是：
 
 ### 6.6 Claude 侧运行后会把数据写到哪里
 
-按当前脚本设计：
+所有 Agent 工具现在共享统一的存储路径：
 
 1. 项目级目录
-   - `<project>/.claude/mistakebook/`
+   - `<project>/.mistakebook/`
 2. 全局级目录
-   - `~/.claude/mistakebook/`
+   - `~/.mistakebook/`
 3. 配置目录
    - `~/.mistakebook/config.json`
 4. 会话恢复 journal
    - `~/.mistakebook/runtime-journal.md`
-
-这里要特别注意一个实现细节：
-
-1. 正式错题与记忆按宿主写入 `.claude/mistakebook/`。
-2. 自动识别开关与 checkpoint journal 却写在通用目录 `~/.mistakebook/`。
-
-也就是说，Claude 的“行为配置”与“案例存储”并不完全在同一个根目录下。
 
 ### 6.7 Claude 侧常见坑点
 
@@ -529,12 +512,12 @@ Codex 的主读取链路通常是：
 
 ### 7.6 Codex 侧运行后会把数据写到哪里
 
-按脚本默认规则：
+所有 Agent 工具共享统一的存储路径：
 
 1. 项目级目录
-   - `<project>/.codex/mistakebook/`
+   - `<project>/.mistakebook/`
 2. 全局级目录
-   - `~/.codex/mistakebook/`
+   - `~/.mistakebook/`
 3. 通用配置
    - `~/.mistakebook/config.json`
 

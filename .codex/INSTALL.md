@@ -4,12 +4,13 @@
 
 ## 功能
 
-- 自动识别“你这里错了 / 还没改对 / 我来纠正你”这类纠错场景
-- 支持“写入记事本 / 记一下这个事项”这类长期事项记录场景
+- 自动识别”你这里错了 / 还没改对 / 我来纠正你”这类纠错场景
+- 支持”写入记事本 / 记一下这个事项”这类长期事项记录场景
 - 首次进入纠错模式时输出固定激活文案
 - 在用户确认后，归档到项目级和全局级错题集或记事本
 - 每次归档都刷新缓存式项目记忆和全局记忆
 - 为 Codex 提供更适合输入框体验的 skill-chip 入口
+- 所有 Agent 工具共享统一存储路径（`<project>/.mistakebook/` 和 `~/.mistakebook/`）
 
 ## 安装
 
@@ -127,10 +128,12 @@ EOF
 2. `--payload`
 3. `--payload-stdin`
 
-## 目录
+## 存储路径（统一）
 
-- 项目级存储：`<project>/.codex/mistakebook/`
-- 全局级存储：`~/.codex/mistakebook/`
+所有 Agent 工具（Codex、Claude Code、VSCode、通用）共享统一的存储路径：
+
+- 项目级存储：`<project>/.mistakebook/`
+- 全局级存储：`~/.mistakebook/`
 
 每个 store 里至少有：
 
@@ -139,4 +142,16 @@ EOF
 - `memory/`
 - `state/`
 
-如果宿主受限于只能写 skill 目录，也可以把全局根显式指定为 `~/.codex/skills/mistakebook/.data/`。
+### 从旧路径迁移
+
+如果你之前使用过旧版存储路径（`.codex/mistakebook/`、`.claude/mistakebook/`、`.vscode/mistakebook/`），运行以下命令自动迁移到统一路径：
+
+```bash
+python scripts/mistakebook_cli.py migrate --host codex --project-root .
+```
+
+迁移脚本会自动：
+1. 扫描所有旧版目录
+2. 合并 catalog（按 caseId 去重）
+3. 移动 failures/notes 文件
+4. 删除旧版目录

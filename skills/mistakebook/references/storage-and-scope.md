@@ -1,180 +1,194 @@
 # Storage And Scope
 
-## 默认目录布局
+## Unified Directory Layout
 
-### 项目级
+All agent tools (Codex, Claude Code, VSCode, generic) share the same storage paths.
 
-1. Codex
-   - `<project>/.codex/mistakebook/failures/`
-   - `<project>/.codex/mistakebook/notes/`
-   - `<project>/.codex/mistakebook/memory/`
-   - `<project>/.codex/mistakebook/state/`
-2. Claude
-   - `<project>/.claude/mistakebook/failures/`
-   - `<project>/.claude/mistakebook/notes/`
-   - `<project>/.claude/mistakebook/memory/`
-   - `<project>/.claude/mistakebook/state/`
-3. VSCode
-   - `<project>/.vscode/mistakebook/failures/`
-   - `<project>/.vscode/mistakebook/notes/`
-   - `<project>/.vscode/mistakebook/memory/`
-   - `<project>/.vscode/mistakebook/state/`
-4. Generic
-   - `<project>/.mistakebook/failures/`
-   - `<project>/.mistakebook/notes/`
-   - `<project>/.mistakebook/memory/`
-   - `<project>/.mistakebook/state/`
+### Project-level
 
-### 全局级
+`<project>/.mistakebook/`
 
-1. Codex
-   - `~/.codex/mistakebook/failures/`
-   - `~/.codex/mistakebook/notes/`
-   - `~/.codex/mistakebook/memory/`
-   - `~/.codex/mistakebook/state/`
-2. Claude
-   - `~/.claude/mistakebook/failures/`
-   - `~/.claude/mistakebook/notes/`
-   - `~/.claude/mistakebook/memory/`
-   - `~/.claude/mistakebook/state/`
-3. VSCode
-   - `~/.vscode/mistakebook/failures/`
-   - `~/.vscode/mistakebook/notes/`
-   - `~/.vscode/mistakebook/memory/`
-   - `~/.vscode/mistakebook/state/`
-4. Generic
-   - `~/.mistakebook/failures/`
-   - `~/.mistakebook/notes/`
-   - `~/.mistakebook/memory/`
-   - `~/.mistakebook/state/`
+```
+.mistakebook/
+├─ failures/
+│  ├─ INDEX.md
+│  └─ <timestamp>_<slug>.md
+├─ notes/
+│  ├─ INDEX.md
+│  └─ <timestamp>_<slug>.md
+├─ memory/
+│  └─ PROJECT_MEMORY.md
+└─ state/
+   ├─ catalog.json
+   └─ memory_state.json
+```
 
-如果宿主不允许写这些默认位置，可以显式指定一个可写的全局根目录。
+### Global-level
 
-## 每个 store 的最小文件
+`~/.mistakebook/`
+
+```
+.mistakebook/
+├─ failures/
+│  ├─ INDEX.md
+│  └─ <timestamp>_<slug>.md
+├─ notes/
+│  ├─ INDEX.md
+│  └─ <timestamp>_<slug>.md
+├─ memory/
+│  └─ GLOBAL_MEMORY.md
+└─ state/
+   ├─ catalog.json
+   └─ memory_state.json
+```
+
+### Runtime state
+
+- Config: `~/.mistakebook/config.json`
+- Session checkpoint: `~/.mistakebook/runtime-journal.md`
+
+## Migration from Legacy Paths
+
+Older versions stored data in per-agent directories:
+
+- `<project>/.codex/mistakebook/`
+- `<project>/.claude/mistakebook/`
+- `<project>/.vscode/mistakebook/`
+- `~/.codex/mistakebook/`
+- `~/.claude/mistakebook/`
+- `~/.vscode/mistakebook/`
+
+Running `bootstrap`, `consolidate`, or `migrate` automatically detects and migrates these legacy directories into the unified `.mistakebook/` path, then deletes the old directories.
+
+```bash
+python scripts/mistakebook_cli.py migrate --host codex --project-root .
+```
+
+## Minimum Files Per Store
 
 1. `failures/INDEX.md`
 2. `notes/INDEX.md`
-3. `memory/PROJECT_MEMORY.md` 或 `memory/GLOBAL_MEMORY.md`
+3. `memory/PROJECT_MEMORY.md` or `memory/GLOBAL_MEMORY.md`
 4. `state/catalog.json`
 5. `state/memory_state.json`
 
-## scopeDecision 判断规则
+## scopeDecision Rules
 
 ### `project`
 
-适用于：
+Applies to:
 
-1. 项目目录结构
-2. 项目专有命名
-3. 项目业务规则
-4. 项目构建/测试/部署流程
-5. 某仓库内特殊约束
+1. Project directory structure
+2. Project-specific naming
+3. Project business rules
+4. Project build/test/deploy workflows
+5. Repo-specific constraints
 
 ### `global`
 
-适用于：
+Applies to:
 
-1. 通用验证缺失
-2. 通用事实核对缺失
-3. 通用沟通误读
-4. 通用推理偏差
-5. 通用工程坏习惯
+1. General verification gaps
+2. General fact-checking gaps
+3. General communication misreads
+4. General reasoning deviations
+5. General engineering bad habits
 
 ### `both`
 
-满足下面两个条件时使用：
+Use when both conditions hold:
 
-1. 这个条目在当前项目里有详细复盘或长期注意价值
-2. 同时还能抽出稳定、可泛化、跨项目可复用的规则
+1. The entry has detailed review or long-term attention value within the current project
+2. It also extracts a stable, generalizable, cross-project reusable rule
 
-## 条目类型
+## Entry Types
 
 ### `mistake`
 
-适用于：
+Applies to:
 
-1. 已经发生的错误
-2. 已经完成纠错的失败案例
-3. 需要复盘“为什么错”的内容
+1. Errors that have occurred
+2. Failure cases that have been fully corrected
+3. Content requiring "why was this wrong" review
 
 ### `note`
 
-适用于：
+Applies to:
 
-1. 不是错误，但值得长期保留的注意事项
-2. 会反复影响后续工作方式的操作约束
-3. 主动记录的提醒、边界、协作习惯
+1. Not errors, but worth long-term preservation
+2. Operational constraints that repeatedly affect future work
+3. Proactively recorded reminders, boundaries, collaboration habits
 
-## 记忆写法
+## Memory Writing
 
-### 项目记忆
+### Project Memory
 
-项目记忆应该保留：
+Project memory should retain:
 
-1. 当前项目稳定约束
-2. 当前项目主动注意事项
-3. 当前项目高风险误区
-4. 已经验证过的最佳实践
+1. Current project stable constraints
+2. Current project active notes
+3. Current project high-risk pitfalls
+4. Validated best practices
 
-### 全局记忆
+### Global Memory
 
-全局记忆应该保留：
+Global memory should retain:
 
-1. 跨项目通用规则
-2. 通用验证纪律
-3. 通用沟通纪律
-4. 通用主动注意事项
+1. Cross-project general rules
+2. General verification discipline
+3. General communication discipline
+4. General active notes
 
-## 记忆是缓存，不是仓库全文索引
+## Memory Is a Cache, Not a Full Index
 
-项目记忆和全局记忆都应视作缓存层：
+Project and global memory should be treated as cache layers:
 
-1. 初期条目还少时，可以几乎全量保留
-2. 一旦超过阈值，就不再机械累加
-3. 要开始按“命中 / 检索 / 新旧程度 / 优先级”筛选
-4. 详细条目永远在 `failures/` 和 `notes/` 里
-5. 缓存层只保留高价值、短而准的摘要
+1. When entries are few, nearly all can be retained
+2. After reaching threshold, stop mechanical accumulation
+3. Begin filtering by hit/retrieval/freshness/priority
+4. Detailed entries always stay in `failures/` and `notes/`
+5. Cache layer only retains high-value, concise summaries
 
-## 命中与遗忘
+## Hit and Deferral
 
-推荐维护两类统计：
+Maintain two metrics:
 
 1. `retrievalCount`
-   - 被飞升模式或其他上下文收集流程读取了多少次
+   - How many times read by ascended mode or context collection
 2. `hitCount`
-   - 被实际证明“仍然值得保留在缓存里”的命中次数
+   - How many times proven "still worth keeping in cache"
 
-推荐策略：
+Strategy:
 
-1. 高命中 + 最近仍活跃
-   - 优先保留在缓存
-2. 低命中 + 长期没有再次检索
-   - 进入 `deferredEntries`
-3. 只是暂时遗忘
-   - 不删除详细条目，只是暂时移出记忆缓存
+1. High hit + recently active
+   - Prioritize keeping in cache
+2. Low hit + long unretrieved
+   - Move to `deferredEntries`
+3. Temporary deferral only
+   - Do not delete detailed entries, only temporarily remove from memory cache
 
-## 每次归档都要更新记忆
+## Every Archive Updates Memory
 
-推荐做法：
+Recommended practice:
 
-1. 把当前条目写成详细 Markdown
-2. 同步更新 `state/catalog.json`
-3. 自动刷新 `memory/*.md`
-4. 如果条目量和噪声开始上升，再执行一次 `consolidate`
+1. Write current entry as detailed Markdown
+2. Synchronously update `state/catalog.json`
+3. Auto-refresh `memory/*.md`
+4. If entry volume and noise increase, run `consolidate`
 
-## full rollup / consolidate 触发条件
+## full rollup / Consolidate Triggers
 
-遇到下列情况时，除了普通刷新，还要做一次集中整理：
+In addition to normal refresh, do a focused cleanup when:
 
-1. 同一主题累计 3 个条目以上
-2. 某个 store 累计新增 5 个条目
-3. 距上次集中整理超过 14 天
-4. 记忆内容已经明显超过阈值
+1. Same topic has 3+ entries
+2. A store has 5+ new entries since last cleanup
+3. More than 14 days since last focused cleanup
+4. Memory content clearly exceeds threshold
 
-`consolidate` 的目标不是增加字数，而是：
+`consolidate` goals are not to increase word count, but to:
 
-1. 合并重复项
-2. 去掉失效项
-3. 提升高命中条目的可见度
-4. 让长期低命中条目暂时退出缓存
-5. 让记忆文件保持短、真、可执行
+1. Merge duplicates
+2. Remove stale entries
+3. Increase visibility of high-hit entries
+4. Temporarily remove long low-hit entries from cache
+5. Keep memory files short, accurate, and executable

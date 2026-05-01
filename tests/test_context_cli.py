@@ -225,7 +225,7 @@ class MistakebookCliContextTests(unittest.TestCase):
             project = output["project"]
             self.assertEqual(project["returnedEntries"], 1)
 
-            catalog_path = Path(project_root) / ".codex" / "mistakebook" / "state" / "catalog.json"
+            catalog_path = Path(project_root) / ".mistakebook" / "state" / "catalog.json"
             catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
             counts = {entry["title"]: entry.get("retrievalCount", 0) for entry in catalog}
             self.assertEqual(counts["先读真实实现"], 1)

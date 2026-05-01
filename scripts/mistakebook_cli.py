@@ -11,18 +11,30 @@ from typing import Any
 
 
 PROJECT_ROOTS = {
-    "codex": ".codex/mistakebook",
-    "claude": ".claude/mistakebook",
-    "vscode": ".vscode/mistakebook",
+    "codex": ".mistakebook",
+    "claude": ".mistakebook",
+    "vscode": ".mistakebook",
     "generic": ".mistakebook",
 }
 
 GLOBAL_ROOTS = {
-    "codex": "~/.codex/mistakebook",
-    "claude": "~/.claude/mistakebook",
-    "vscode": "~/.vscode/mistakebook",
+    "codex": "~/.mistakebook",
+    "claude": "~/.mistakebook",
+    "vscode": "~/.mistakebook",
     "generic": "~/.mistakebook",
 }
+
+LEGACY_PROJECT_ROOTS = [
+    ".codex/mistakebook",
+    ".claude/mistakebook",
+    ".vscode/mistakebook",
+]
+
+LEGACY_GLOBAL_ROOTS = [
+    "~/.codex/mistakebook",
+    "~/.claude/mistakebook",
+    "~/.vscode/mistakebook",
+]
 
 CONFIG_PATH = Path("~/.mistakebook/config.json").expanduser()
 DEFAULT_MEMORY_THRESHOLD = 12
@@ -258,6 +270,102 @@ def ensure_store(base: Path, scope: str) -> dict[str, str]:
         "memory_state_path": str(memory_state_path),
         "catalog_path": str(catalog_path),
     }
+
+
+def _collect_legacy_entries(legacy_base: Path, subdir: str) -> list[Path]:
+    target = legacy_base / subdir
+    if not target.exists():
+        return []
+    return [p for p in target.iterdir() if p.is_file() and p.name != "INDEX.md"]
+
+
+def _merge_catalogs(target_path: Path, source_path: Path) -> list[dict[str, Any]]:
+    target_catalog = load_catalog(target_path)
+    source_catalog = load_catalog(source_path)
+    existing_ids = {entry.get("caseId") for entry in target_catalog}
+    for entry in source_catalog:
+        if entry.get("caseId") not in existing_ids:
+            target_catalog.append(entry)
+            existing_ids.add(entry.get("caseId"))
+    return target_catalog
+
+
+def migrate_legacy_stores(project_root: Path) -> dict[str, Any]:
+    """Migrate old per-agent directories (.codex/mistakebook, .claude/mistakebook,
+    .vscode/mistakebook) into the unified .mistakebook/ directory, then remove
+    the legacy directories."""
+    report: dict[str, Any] = {"project_migrated": [], "global_migrated": [], "errors": []}
+
+    # --- project-level migration ---
+    unified_project = project_root / ".mistakebook"
+    for legacy_suffix in LEGACY_PROJECT_ROOTS:
+        legacy_base = project_root / legacy_suffix
+        if not legacy_base.exists():
+            continue
+        try:
+            for subdir in ("failures", "notes"):
+                for src_file in _collect_legacy_entries(legacy_base, subdir):
+                    dest = unified_project / subdir / src_file.name
+                    if not dest.exists():
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        src_file.rename(dest)
+                    else:
+                        src_file.unlink()
+
+            for catalog_name in ("catalog.json",):
+                src_cat = legacy_base / "state" / catalog_name
+                if src_cat.exists():
+                    dest_cat = unified_project / "state" / catalog_name
+                    if dest_cat.exists():
+                        merged = _merge_catalogs(dest_cat, src_cat)
+                        write_json(dest_cat, merged)
+                    else:
+                        dest_cat.parent.mkdir(parents=True, exist_ok=True)
+                        src_cat.rename(dest_cat)
+                    src_cat.unlink(missing_ok=True)
+
+            # Remove empty legacy dirs
+            import shutil
+            shutil.rmtree(legacy_base, ignore_errors=True)
+            report["project_migrated"].append(legacy_suffix)
+        except Exception as exc:
+            report["errors"].append(f"{legacy_suffix}: {exc}")
+
+    # --- global-level migration ---
+    unified_global = Path("~/.mistakebook").expanduser()
+    for legacy_suffix in LEGACY_GLOBAL_ROOTS:
+        legacy_base = Path(legacy_suffix).expanduser()
+        if not legacy_base.exists():
+            continue
+        try:
+            for subdir in ("failures", "notes"):
+                for src_file in _collect_legacy_entries(legacy_base, subdir):
+                    dest = unified_global / subdir / src_file.name
+                    if not dest.exists():
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        src_file.rename(dest)
+                    else:
+                        src_file.unlink()
+
+            for catalog_name in ("catalog.json",):
+                src_cat = legacy_base / "state" / catalog_name
+                if src_cat.exists():
+                    dest_cat = unified_global / "state" / catalog_name
+                    if dest_cat.exists():
+                        merged = _merge_catalogs(dest_cat, src_cat)
+                        write_json(dest_cat, merged)
+                    else:
+                        dest_cat.parent.mkdir(parents=True, exist_ok=True)
+                        src_cat.rename(dest_cat)
+                    src_cat.unlink(missing_ok=True)
+
+            import shutil
+            shutil.rmtree(legacy_base, ignore_errors=True)
+            report["global_migrated"].append(legacy_suffix)
+        except Exception as exc:
+            report["errors"].append(f"{legacy_suffix}: {exc}")
+
+    return report
 
 
 def render_bullets(items: list[str], empty_message: str = "- None") -> str:
@@ -1107,11 +1215,22 @@ def touch_catalog_entries(
 def bootstrap_command(args: argparse.Namespace) -> int:
     project_root = Path(args.project_root).resolve()
     result: dict[str, Any] = {"host": args.host}
+    result["migration"] = migrate_legacy_stores(project_root)
     if args.scope in {"project", "both"}:
         result["project"] = ensure_store(resolve_project_base(args.host, project_root), "project")
     if args.scope in {"global", "both"}:
         result["global"] = ensure_store(resolve_global_base(args.host, args.global_root), "global")
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
+def migrate_command(args: argparse.Namespace) -> int:
+    project_root = Path(args.project_root).resolve()
+    report = migrate_legacy_stores(project_root)
+    # Rebuild unified stores after migration
+    ensure_store(resolve_project_base(args.host, project_root), "project")
+    ensure_store(resolve_global_base(args.host, args.global_root), "global")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -1172,6 +1291,7 @@ def consolidate_scope(
 def consolidate_command(args: argparse.Namespace) -> int:
     project_root = Path(args.project_root).resolve()
     result: dict[str, Any] = {"host": args.host, "scope": args.scope}
+    result["migration"] = migrate_legacy_stores(project_root)
     reason = args.reason or "Consolidate: rebuilt memory from cache threshold and hit metrics"
     if args.scope in {"project", "both"}:
         result["project"] = consolidate_scope(
@@ -1575,6 +1695,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_location_args(bootstrap)
     bootstrap.add_argument("--scope", choices=("project", "global", "both"), default="both")
     bootstrap.set_defaults(func=bootstrap_command)
+
+    migrate = subparsers.add_parser("migrate", help="Migrate legacy per-agent stores to unified .mistakebook/ path.")
+    add_common_location_args(migrate)
+    migrate.set_defaults(func=migrate_command)
 
     archive = subparsers.add_parser("archive", help="Archive one mistake or notebook entry and refresh memories.")
     add_common_location_args(archive)

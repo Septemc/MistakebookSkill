@@ -1,8 +1,37 @@
+<div align="center">
+
+**中文** · [English](./README.en.md)
+
+# 📝 MistakeBook Skill
+
+#### 我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了! 
+纠错闭环 + 飞升模式 + 缓存式记忆
+
+[![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
+[![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
+
+![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
+![Codex](https://img.shields.io/badge/Codex-Skill-10B981?style=flat-square&logo=openai&logoColor=white)
+
+</div>
+
 # Mistakebook Skill
 
-错题集.Skill。我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了! / I have done tens of thousands of practice problems, and I have summarized a vast amount of wrong answers. Now, I am invincible.
+> 我已经刷了几万道练习题，我已经总结了海量的错题，我现在什么都不缺了!
 
 ![](docs/assets/825b6024898386ec7ccef3496b3efe26.jpg)
+
+---
+
+## 📦 安装方式
+
+在 Claude Code、Codex 等支持 Skill 的 Agent 里，直接说：
+
+```
+帮我安装 Mistakebook Skill：https://github.com/Septemc/MistakebookSkill.git
+```
+
+---
 
 ## 这次版本的核心升级
 
@@ -205,10 +234,15 @@ Agent 会进入学霸模式预检。
 
 ## 存储结构
 
-默认每个 store 至少包含：
+所有 Agent 工具（Codex、Claude Code、VSCode、通用）共享统一的存储路径：
+
+- **项目级存储**：`<project>/.mistakebook/`
+- **全局级存储**：`~/.mistakebook/`
+
+每个 store 至少包含：
 
 ```text
-mistakebook/
+.mistakebook/
 ├─ failures/
 │  ├─ INDEX.md
 │  └─ <timestamp>_<slug>.md
@@ -223,7 +257,21 @@ mistakebook/
    └─ memory_state.json
 ```
 
-其中：
+### 从旧路径迁移
+
+如果你之前使用过旧版存储路径（`.codex/mistakebook/`、`.claude/mistakebook/`、`.vscode/mistakebook/`），运行以下命令自动迁移到统一路径：
+
+```bash
+python scripts/mistakebook_cli.py migrate --host codex --project-root .
+```
+
+迁移脚本会自动：
+1. 扫描所有旧版目录
+2. 合并 catalog（按 caseId 去重）
+3. 移动 failures/notes 文件
+4. 删除旧版目录
+
+### 存储说明
 
 1. `failures/`
    - 详细错题条目
@@ -371,14 +419,22 @@ python scripts/mistakebook_cli.py context --host codex --project-root . --scope 
 python scripts/mistakebook_cli.py status --host codex --project-root . --scope both
 ```
 
-### 8. 自动识别开关
+### 8. 迁移旧存储
+
+```bash
+python scripts/mistakebook_cli.py migrate --host codex --project-root .
+```
+
+自动检测并迁移旧版存储路径（`.codex/mistakebook/`、`.claude/mistakebook/`、`.vscode/mistakebook/`）到统一的 `.mistakebook/` 目录。
+
+### 9. 自动识别开关
 
 ```bash
 python scripts/mistakebook_cli.py config --auto-detect on
 python scripts/mistakebook_cli.py config --auto-detect off
 ```
 
-### 9. 评估触发规则
+### 10. 评估触发规则
 
 ```bash
 python scripts/eval_triggers.py
@@ -526,3 +582,7 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 `reference_code/` 只是本地参考材料，不属于这个 Skill 项目的正式发布内容。
 
 仓库的 `.gitignore` 已经把它排除掉，避免把参考仓库一并提交进去。
+
+## License
+
+MIT License - 详见 [LICENSE](./LICENSE)
