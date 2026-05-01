@@ -10,7 +10,7 @@ The user explicitly requested the highest-level correction workflow.
 You MUST do all of the following immediately:
 1. Load the `mistakebook` skill if it is not already active.
 2. First display exactly:
-我现在会根据我见过最有效的方法来处理这个问题，我将检索我的所有知识库，我现在什么都不缺了！
+I will now handle this problem using the most effective method I have seen. I will search all my knowledge bases. I am ready!
 3. Treat the current issue as an Ascended Mode correction case.
 4. Before proposing the next fix, comprehensively review:
    - project-level failures

@@ -1,110 +1,110 @@
 ---
 name: mistakebook
-description: "识别用户进入纠错、返工、指出错误、要求记录长期注意事项的场景，启动带人工确认的闭环；统一支持 `mistake` 与 `note` 两类条目，写入项目级和/或全局级错题集 / 记事本，并同步刷新缓存式项目记忆与全局记忆。若同一个案例被用户否定两次以上，或用户说“你需要根据你见过最有效的方法来处理这个问题”或输入“/ascended”，自动升级到飞升模式（Ascended Mode），全面检索项目级/全局级错题、记事本、记忆缓存和当前知识库后再处理。常见触发：'你这里错了'、'这不对'、'重新改'、'我来纠正你'、'还没改对'、'写入记事本'、'记一下这个事项'、'/mistakebook'、'/ascended'."
+description: "Detects when the user is correcting, reworking, pointing out mistakes, or requesting long-term notes to be preserved; launches a human-confirmation loop. Supports both `mistake` and `note` entry types, writing to project-level and/or global-level mistakebook / notebook, and synchronously refreshes cached project memory and global memory. If the same case is rejected twice or more by the user, or the user says 'use the most effective method you have seen to handle this' or inputs '/ascended', automatically escalates to Ascended Mode — comprehensively retrieving project/global mistakes, notes, memory cache, and current knowledge base before proceeding. Common triggers: 'you are wrong', 'this is not right', 'redo this', 'let me correct you', 'still not fixed', 'write to notebook', 'note this item', '/mistakebook', '/ascended'."
 ---
 
-# 错题集 / 记事本 Skill
+# Mistakebook / Notebook Skill
 
-这个 Skill 不只负责“纠错归档”，还负责“主动事项沉淀”。
+This Skill handles not only "correction archiving" but also "active item preservation."
 
-统一目标有四个：
+Four unified goals:
 
-1. 把用户纠错变成闭环
-2. 把长期注意事项沉淀成记事本
-3. 把项目记忆和全局记忆维护成缓存，而不是流水账
-4. 在普通修补不够时，升级到飞升模式做全量检索和最强方案处理
+1. Turn user corrections into a closed loop
+2. Preserve long-term attention items into the notebook
+3. Maintain project memory and global memory as caches, not append-only logs
+4. When ordinary fixes are insufficient, escalate to Ascended Mode for full retrieval and strongest-possible handling
 
-## 启动后先做什么
+## After Loading
 
-加载本 Skill 后，立刻阅读以下文件：
+After loading this Skill, immediately read these files:
 
 1. `references/activation-patterns.md`
 2. `references/storage-and-scope.md`
 3. `references/archive-schema.md`
 4. `references/ascended-mode.md`
 
-不要等“按需发现”再读，这四个文件共同定义了触发、升级、归档、缓存和遗忘策略。
+Do not wait for "on-demand discovery" — these four files collectively define triggering, escalation, archiving, caching, and deferral strategy.
 
-## 强制文案
+## Mandatory Display Text
 
-### 进入纠错模式时
+### When Entering Correction Mode
 
-当你第一次明确判断“用户正在纠正我”时，必须先输出这句，逐字一致：
+When you first determine that the user is correcting you, you must output this exact text:
 
-`<错题集.Skill>我接下来会进行纠错，并根据你的纠错信息，持续纠错直到完成，然后写入我的错题集。`
+`<Mistakebook.Skill>I will now correct my mistake based on your feedback, continue correcting until completion, and archive it to my mistakebook.`
 
-### 每轮纠错结束时
+### After Each Correction Turn
 
-只要当前 `mistake` 案例还没有被用户明确确认完成，你的回复结尾都必须追加这句，逐字一致：
+As long as the current `mistake` case has not been explicitly confirmed complete by the user, you must append this exact text at the end of every reply:
 
-`我有没有吃透当前问题，是否成功纠正错误，如果没有的话，请你再教我一遍。（如果我已经完成了纠错，也请你告诉我一声，我可以把错题写入我的错题集）`
+`Have I fully understood the issue and successfully corrected the mistake? If not, please teach me again. (If I have completed the correction, please let me know so I can archive it to my mistakebook.)`
 
-### 记事本追问句
+### Notebook Follow-up
 
-只要当前回复里已经形成一个值得长期保留的主动事项，你的回复结尾都应该追加这句，逐字一致：
+Whenever your reply contains a stable long-term takeaway worth preserving, append this exact text at the end:
 
-`如果这个事项值得长期注意，也可以告诉我“写入记事本”，我会把它归档到记事本并同步刷新记忆。`
+`If this item is worth long-term attention, you can also tell me "write to notebook" and I will archive it to the notebook and refresh my memory.`
 
-### 飞升模式强制文案
+### Ascended Mode Mandatory Text
 
-当你进入 Ascended Mode 时，必须先输出这句，逐字一致：
+When entering Ascended Mode, you must first output this exact text:
 
-`我现在会根据我见过最有效的方法来处理这个问题，我将检索我的所有知识库，我现在什么都不缺了！`
+`I will now handle this problem using the most effective method I have seen. I will search all my knowledge bases. I am ready!`
 
-## 条目类型
+## Entry Types
 
-从现在开始，只维护两类归档条目：
+From now on, maintain only two types of archived entries:
 
 1. `mistake`
-   - 已经完成纠错、值得复盘的错误案例
+   - Error cases that have been fully corrected and are worth reviewing
 2. `note`
-   - 不一定是错误，但值得长期注意、主动记录的事项
+   - Not necessarily errors, but items worth long-term attention and active recording
 
-## 状态机
+## State Machine
 
-把当前流程看成下面这些状态：
+Model the current flow as these states:
 
 1. `disabled`
-   - 当前没有进入闭环
+   - Not currently in any loop
 2. `armed`
-   - 已识别到纠错或记事需求
+   - Correction or note need detected
 3. `pending_review`
-   - 已给出当前修正或整理结果，等待用户确认
+   - Current fix or note summary given, awaiting user confirmation
 4. `followup_needed`
-   - 用户要求继续修正或继续补充事项
+   - User requests continued correction or additional note content
 5. `summarizing`
-   - 用户明确确认，开始整理 payload
+   - User has explicitly confirmed, begin payload assembly
 6. `archived`
-   - 已经写入详细条目与缓存记忆
+   - Written to detailed entry and cached memory
 
-除此之外，还要维护：
+Additionally, maintain:
 
 1. `entry_type`
-   - `mistake` 或 `note`
+   - `mistake` or `note`
 2. `mode`
-   - `normal` 或 `ascended`
+   - `normal` or `ascended`
 
-## 何时进入 mistake
+## When to Enter `mistake`
 
-满足任一条件就进入 `mistake`：
+Enter `mistake` when any condition is met:
 
-1. 用户明确说你错了、没改对、又犯同样错误
-2. 用户开始逐条纠正你的表述、代码、方案或行为
-3. 用户给出“按我说的改”“我来教你一遍”“重新做一版”的指令
-4. 用户提到“错题集”“纠错模式”“归档这次错误”
+1. User explicitly says you are wrong, haven't fixed it, or made the same error again
+2. User begins correcting your statements, code, solutions, or behavior item by item
+3. User gives instructions like "fix it my way", "let me teach you", "redo it"
+4. User mentions "mistakebook", "correction mode", "archive this mistake"
 
-## 何时进入 note
+## When to Enter `note`
 
-满足任一条件就进入 `note` 归档候选流程：
+Enter `note` archive candidate flow when any condition is met:
 
-1. 用户明确说“写入记事本”
-2. 用户说“记一下这个事项”
-3. 用户明确指出“这不是错题，但要长期注意”
-4. 你已经形成一个稳定、可执行、值得长期保留的注意事项
+1. User explicitly says "write to notebook"
+2. User says "note this item"
+3. User explicitly states "this is not a mistake, but needs long-term attention"
+4. You have formed a stable, executable, long-term-worth-preserving attention item
 
-## 运行态
+## Runtime State
 
-至少持续维护这些信息，直到归档完成：
+Maintain at least this information until archiving is complete:
 
 1. `entry_type`
 2. `case_id`
@@ -123,118 +123,118 @@ description: "识别用户进入纠错、返工、指出错误、要求记录长
 15. `knowledge_sources_reviewed`
 16. `note_candidates`
 
-如果发生上下文压缩，优先把这些信息 checkpoint 到 `~/.mistakebook/runtime-journal.md`。
+If context compaction occurs, prioritize checkpointing this information to `~/.mistakebook/runtime-journal.md`.
 
-## mistake 闭环
+## `mistake` Loop
 
-### 1. 进入
+### 1. Entry
 
-一旦确认是纠错场景：
+Once confirmed as a correction scenario:
 
-1. 先输出激活句
-2. 给出修正后的回答
-3. 结尾追加固定纠错追问句
-4. 如果这一轮还沉淀出一个长期有效事项，再追加记事本追问句
+1. Output the activation message
+2. Provide the corrected answer
+3. Append the fixed correction follow-up at the end
+4. If this round also surfaces a long-term item, additionally append the notebook follow-up
 
-### 2. 用户说“还没改对”
+### 2. User Says "Still Not Fixed"
 
-你必须：
+You must:
 
-1. 把这次用户反馈并入同一个案例
-2. 按反馈继续纠正，不要提前归档
-3. 在本轮纠正结尾继续追加固定纠错追问句
+1. Merge this user feedback into the same case
+2. Continue correcting based on feedback, do not archive prematurely
+3. Continue appending the fixed correction follow-up at the end of this round
 4. `rejection_count += 1`
 5. `correction_attempt_count += 1`
 
-### 3. 自动升级到飞升模式
+### 3. Automatic Escalation to Ascended Mode
 
-如果同一个 `mistake` 案例已经被用户明确否定两次或以上，就不要再以普通修补模式继续处理，而要自动升级到 Ascended Mode。
+If the same `mistake` case has been explicitly rejected by the user twice or more, do not continue with ordinary fix mode — automatically escalate to Ascended Mode.
 
-自动升级条件：
+Automatic escalation conditions:
 
 1. `rejection_count >= 2`
-2. 同一个 case 已经明显进入“改了两次以上还是错”的状态
+2. The same case has clearly entered "still wrong after multiple fixes" state
 
-一旦自动升级：
+Once automatically escalated:
 
-1. 先输出飞升模式固定文案
-2. 再全面检索项目级和全局级知识来源
-3. 先分析为什么连续纠错仍失败
-4. 再给出新的修正
+1. First output the Ascended Mode mandatory text
+2. Then comprehensively retrieve project-level and global-level knowledge sources
+3. First analyze why consecutive corrections still failed
+4. Then provide a new correction
 
-## note 闭环
+## `note` Loop
 
-### 1. 进入
+### 1. Entry
 
-一旦确认是主动记录事项：
+Once confirmed as an active item to record:
 
-1. 先给出当前事项的整理结果
-2. 明确说明为什么这条值得长期保留
-3. 结尾追加记事本追问句
+1. First provide the current item summary
+2. Clearly explain why this item is worth long-term preservation
+3. Append the notebook follow-up at the end
 
-### 2. 未确认时
+### 2. When Unconfirmed
 
-如果用户继续补充：
+If the user continues adding content:
 
-1. 把补充内容并入同一个 `note` 案例
-2. 更新事项、行动项或边界说明
-3. 不要提前归档
+1. Merge additions into the same `note` case
+2. Update items, action items, or boundary descriptions
+3. Do not archive prematurely
 
-### 3. 完成信号
+### 3. Completion Signal
 
-只有在用户明确确认后，才允许把当前事项归档为 `note`。
+Only archive the current item as `note` after explicit user confirmation.
 
-可视为显式确认的表达包括：
+Expressions considered explicit confirmation:
 
-1. `写入记事本`
-2. `记下来`
-3. `长期保留这条`
-4. `把这个事项存起来`
-5. `这个以后都要注意`
+1. `write to notebook`
+2. `note it down`
+3. `preserve this long-term`
+4. `save this item`
+5. `remember this going forward`
 
-## 手动进入飞升模式
+## Manual Entry to Ascended Mode
 
-下面任一情况都必须立刻进入 Ascended Mode：
+Any of the following must immediately enter Ascended Mode:
 
-1. 用户说：`你需要根据你见过最有效的方法来处理这个问题`
-2. 用户输入：`/ascended`
+1. User says: `use the most effective method you have seen to handle this`
+2. User inputs: `/ascended`
 
-手动触发优先级高于自动判断。收到后直接进入飞升模式，不需要等待下一轮。
+Manual trigger takes priority over automatic judgment. Enter Ascended Mode immediately upon receipt — no need to wait for the next round.
 
-## 飞升模式下必须检索的知识源
+## Knowledge Sources for Ascended Mode
 
-进入飞升模式后，必须尽量完整检索并使用这些来源：
+After entering Ascended Mode, you must thoroughly retrieve and use these sources:
 
-1. 当前项目级错题集 `failures/`
-2. 当前项目级记事本 `notes/`
-3. 当前项目级记忆 `memory/PROJECT_MEMORY.md`
-4. 当前项目级缓存状态 `state/memory_state.json`
-5. 当前全局级错题集 `failures/`
-6. 当前全局级记事本 `notes/`
-7. 当前全局级记忆 `memory/GLOBAL_MEMORY.md`
-8. 当前全局级缓存状态 `state/memory_state.json`
-9. 当前仓库中与问题直接相关的真实文件、真实输出、真实文档
-10. 当前 Skill 的规则文件与参考文档
-11. 当前会话里已经累积的全部用户纠错链和事项链
+1. Current project-level mistake archive `failures/`
+2. Current project-level notebook `notes/`
+3. Current project-level memory `memory/PROJECT_MEMORY.md`
+4. Current project-level cache state `state/memory_state.json`
+5. Current global-level mistake archive `failures/`
+6. Current global-level notebook `notes/`
+7. Current global-level memory `memory/GLOBAL_MEMORY.md`
+8. Current global-level cache state `state/memory_state.json`
+9. Real files, real outputs, real docs in the current repo relevant to the problem
+10. This Skill's rule files and reference documents
+11. All user correction chains and item chains accumulated in the current session
 
-不要只说“我会深度分析”，却不做真实检索。
+Do not just say "I will do deep analysis" without performing real retrieval.
 
-## 飞升模式的输出纪律
+## Ascended Mode Output Discipline
 
-进入飞升模式后，在给出新修正前，你至少需要做到：
+After entering Ascended Mode, before providing a new correction, you must at least:
 
-1. 明确指出为什么前面几轮仍然失败
-2. 明确说明你参考了哪些错题、记事本、记忆或真实文件
-3. 明确选出当前最有效的一种处理方案
-4. 优先基于真实文件和真实输出，而不是基于印象修补
+1. Clearly state why the previous rounds still failed
+2. Clearly describe which mistakes, notes, memory, or real files you consulted
+3. Clearly select the single most effective handling approach available
+4. Prioritize real files and real outputs over impression-based patching
 
-## 归档流程
+## Archive Flow
 
-### 1. 先生成结构化 payload
+### 1. Generate Structured Payload
 
-使用 `references/archive-schema.md` 里的 schema 生成 payload。
+Use the schema in `references/archive-schema.md` to generate the payload.
 
-至少要带上：
+Must include at minimum:
 
 1. `entryType`
 2. `title`
@@ -244,111 +244,114 @@ description: "识别用户进入纠错、返工、指出错误、要求记录长
 6. `rules`
 7. `confirmedUnderstanding`
 
-如果是 `mistake`，再补：
+For `mistake`, additionally include:
 
 1. `originalPrompt`
 2. `correctionFeedback`
 3. `finalReply`
 
-如果是 `note`，再补：
+For `note`, additionally include:
 
 1. `noteReason`
 2. `noteContent`
 3. `noteActionItems`
 4. `noteContext`
 
-### 2. 优先使用脚本落盘
+### 2. Prefer Script-Based Archiving
 
-如果仓库内存在 `scripts/mistakebook_cli.py`，优先使用它：
+If `scripts/mistakebook_cli.py` exists in the repo, prefer using it:
 
 ```bash
 python scripts/mistakebook_cli.py bootstrap --host codex --project-root .
 python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-file <temp-json>
 ```
 
-### 3. 记录缓存命中
+### 3. Record Cache Hits
 
-如果某条错题、记事本或记忆在后续被再次检索或再次证明有效，优先记录它的命中情况：
+If a mistake, note, or memory entry is later retrieved or proves effective again, record the hit:
 
 ```bash
 python scripts/mistakebook_cli.py touch --host codex --project-root . --scope both --case-id <case-id> --kind hit
 ```
 
-### 4. 重写缓存记忆
+### 4. Rewrite Cache Memory
 
-如果条目已经开始变多，或者缓存需要遗忘整理，执行：
+If entries are growing or the cache needs deferral cleanup, run:
 
 ```bash
 python scripts/mistakebook_cli.py consolidate --host codex --project-root . --scope both
 ```
 
-### 5. 飞升模式导出上下文
+### 5. Export Ascended Mode Context
 
-如果你正在进入飞升模式，优先执行：
+If entering Ascended Mode, prefer running:
 
 ```bash
 python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
 ```
 
-## 记忆不是流水账
+## Memory Is Not an Append-Only Log
 
-项目记忆和全局记忆都属于缓存层，不是全文仓库。
+Project memory and global memory are cache layers, not full archives.
 
-它们必须满足：
+They must be:
 
-1. 精简
-2. 凝练
-3. 真实
-4. 可执行
-5. 可遗忘
+1. Concise
+2. Condensed
+3. Accurate
+4. Executable
+5. Deferrable
 
-## 缓存与遗忘
+## Cache and Deferral
 
-默认策略：
+Default policy:
 
-1. 条目还少时，可以几乎全量保留
-2. 达到阈值后，开始按 `hitCount`、`retrievalCount`、最近活跃时间和优先级筛选
-3. 长期低命中、长期不再检索的内容，暂时退出缓存
-4. 详细条目永远保留在 `failures/` 和 `notes/` 里
+1. When entries are few, nearly all can be retained
+2. After reaching threshold, filter by `hitCount`, `retrievalCount`, recent activity time, and priority
+3. Long-inactive, low-hit entries temporarily exit the cache
+4. Detailed entries are always preserved in `failures/` and `notes/`
 
-## 宿主与路径
+## Host and Paths
 
-默认目录：
+Default directories:
 
-1. 项目级
+1. Project-level
    - `failures/`
    - `notes/`
    - `memory/`
    - `state/`
-2. 全局级
+2. Global-level
    - `failures/`
    - `notes/`
    - `memory/`
    - `state/`
 
-如果宿主只能写 skill/plugin 目录，可以把全局根定向到宿主目录里的 `.data` 或 `.mistakebook` 子目录。
+If the host can only write to a skill/plugin directory, redirect the global root to a `.data` or `.mistakebook` subdirectory within the host directory.
 
-## 容易犯错的地方
+## Common Pitfalls
 
-1. 不要把“用户在讨论 bug”误判成“用户在纠正你”
-2. 不要在用户还没确认前提前归档
-3. 不要只记录“错在哪里”，也要记录“已经吃透了什么”
-4. 不要让记忆变成流水账；记忆只保留高密度、可执行内容
-5. 不要把“暂时遗忘”理解成“删除详细条目”
-6. 不要进入飞升模式后只看缓存，不看详细错题和记事本
+1. Do not mistake "user is discussing a bug" for "user is correcting you"
+2. Do not archive before the user has confirmed
+3. Do not only record "what went wrong" — also record "what was fully understood"
+4. Do not let memory become an append-only log; retain only high-density, executable content
+5. Do not confuse "temporary deferral" with "deleting detailed entries"
+6. Do not enter Ascended Mode and only check the cache without reviewing detailed mistakes and notes
+
 ## Scholar Preflight
 
-鍦ㄦ柊鐨勬櫘閫氫换鍔″紑濮嬪墠锛屽鏋滃綋鍓嶄笉鍦?`mistake` 绾犻敊闂幆銆?`note` 娴佺▼鎴?`ascended` 妯″紡閲岋紝鍏堣繍琛岃交閲忛妫€锛?
+Before a new normal task begins, if the current session is not in `mistake` correction loop, `note` flow, or `ascended` mode, run a lightweight preflight check:
 
 ```bash
-python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"
+python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<current task>"
 ```
 
-鎵ц瑙勫垯锛?
+Execution rules:
 
-1. 鍙湁褰?`scholar` 杩斿洖 `shouldInject = true` 鏃讹紝鎵嶅湪姝ｅ紡鍥炵瓟鍓嶈緭鍑轰竴琛屽巻鍙叉彁閱?2. 濡傛灉杩斿洖 `shouldInject = false`锛屽繀椤婚潤榛橈紝涓嶈鎶?query 缁撴灉鍘熸牱灞曠ず缁欑敤鎴?3. 涓€鏃﹁繘鍏ョ籂閿欓棴鐜垨 Ascended Mode锛屽氨鍋滄杩愯 `scholar`
-4. `scholar` 鐨勮亴璐ｆ槸鈥滃洖绛斿墠閬块敊鈥濓紝`ascended` 鐨勮亴璐ｆ槸鈥滃け璐ュ悗鍗囩骇澶勭疆鈥濓紝涓よ€呬笉鑳芥贩鍚堟垚鍚屼竴涓噸妯″紡
-5. 濡傛灉鐢ㄦ埛璇?`scholar off` 或 `scholar on`锛屽彲浠ュ湪褰撳墠浼氳瘽涓存椂鍏抽棴鎴栨仮澶嶉妫€锛涘鏋滅敤鎴疯姹傞暱鏈熷叧闂垨寮€鍚紝鍐嶆墽琛岋細
+1. Only output a history reminder before the substantive answer when `scholar` returns `shouldInject = true`
+2. If `shouldInject = false`, stay silent and do not show query results to the user
+3. Stop running `scholar` once entering correction loop or Ascended Mode
+4. `scholar` is responsible for "pre-answer mistake prevention"; `ascended` is responsible for "post-failure escalation" — do not conflate the two into a single heavy mode
+5. If the user says `scholar off` or `scholar on`, you can temporarily disable or re-enable preflight in the current session; for long-term changes, run:
 
 ```bash
 python scripts/mistakebook_cli.py config --scholar off

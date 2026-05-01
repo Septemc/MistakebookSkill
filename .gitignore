@@ -1,10 +1,12 @@
 # Local reference repository, not part of the distributable project
 reference_code/
 docs/personal/
+docs/内容汇报/
 
 # Python cache
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Local runtime outputs that may be created while testing the skill
 .mistakebook/
@@ -12,6 +14,7 @@ __pycache__/
 .vscode/mistakebook/
 .vscode/mcp.json
 .codex/mistakebook/
+.codex/
 
 # OS junk
 .DS_Store

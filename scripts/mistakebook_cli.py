@@ -127,11 +127,11 @@ def entry_directory(entry_type: str) -> str:
 
 
 def entry_label(entry_type: str) -> str:
-    return "记事本" if entry_type == "note" else "错题"
+    return "Notebook" if entry_type == "note" else "Mistake"
 
 
 def entry_summary_label(entry_type: str) -> str:
-    return "事项总结" if entry_type == "note" else "错误总结"
+    return "Note Summary" if entry_type == "note" else "Mistake Summary"
 
 
 def read_json(path: Path, default: Any) -> Any:
@@ -173,18 +173,18 @@ def load_config() -> dict[str, Any]:
 
 
 def seed_index(scope_label: str, entry_type: str) -> str:
-    name = f"{scope_label}{entry_label(entry_type)}索引"
+    name = f"{scope_label} {entry_label(entry_type)} Index"
     if entry_type == "note":
-        note = "只收录已经明确确认值得长期注意的主动事项"
+        note = "Only notes explicitly confirmed as worth long-term attention"
     else:
-        note = "只收录已经被用户明确确认完成纠错的案例"
+        note = "Only mistakes explicitly confirmed as fully corrected by the user"
     return (
         f"# {name}\n\n"
         f"- updated_at: {utc_now()}\n"
         f"- total_entries: 0\n"
         f"- note: {note}\n\n"
-        "## 条目\n"
-        "- 暂无\n"
+        "## Entries\n"
+        "- None\n"
     )
 
 
@@ -197,19 +197,19 @@ def seed_memory(memory_title: str) -> str:
         "- deferred_entries: 0\n"
         f"- memory_threshold: {DEFAULT_MEMORY_THRESHOLD}\n"
         f"- stale_after_days: {DEFAULT_STALE_DAYS}\n"
-        "- cache_policy: 优先保留最近命中、最近检索、仍然稳定有效的内容\n\n"
-        "## 当前稳定规则\n"
-        "- 暂无\n\n"
-        "## 当前注意事项\n"
-        "- 暂无\n\n"
-        "## 已经吃透\n"
-        "- 暂无\n\n"
-        "## 高风险提醒\n"
-        "- 暂无\n\n"
-        "## 暂时遗忘候选\n"
-        "- 暂无\n\n"
-        "## 最近一次刷新原因\n"
-        "- 初始化\n"
+        "- cache_policy: Prefer recently hit, recently retrieved, and still stable entries\n\n"
+        "## Stable Rules\n"
+        "- None\n\n"
+        "## Active Notes\n"
+        "- None\n\n"
+        "## Confirmed Understanding\n"
+        "- None\n\n"
+        "## High-Risk Reminders\n"
+        "- None\n\n"
+        "## Deferred Candidates\n"
+        "- None\n\n"
+        "## Last Refresh Reason\n"
+        "- Initialization\n"
     )
 
 
@@ -229,12 +229,12 @@ def ensure_store(base: Path, scope: str) -> dict[str, str]:
     memory_state_path = state_dir / "memory_state.json"
     if scope == "project":
         memory_path = memory_dir / "PROJECT_MEMORY.md"
-        memory_title = "项目记忆"
-        scope_label = "项目级"
+        memory_title = "Project Memory"
+        scope_label = "Project"
     else:
         memory_path = memory_dir / "GLOBAL_MEMORY.md"
-        memory_title = "全局记忆"
-        scope_label = "全局级"
+        memory_title = "Global Memory"
+        scope_label = "Global"
 
     if not failures_index_path.exists():
         write_text(failures_index_path, seed_index(scope_label, "mistake"))
@@ -260,13 +260,13 @@ def ensure_store(base: Path, scope: str) -> dict[str, str]:
     }
 
 
-def render_bullets(items: list[str], empty_message: str = "- 暂无") -> str:
+def render_bullets(items: list[str], empty_message: str = "- None") -> str:
     if not items:
         return empty_message
     return "\n".join(f"- {item}" for item in items)
 
 
-def render_numbered(items: list[str], empty_message: str = "1. 暂无") -> str:
+def render_numbered(items: list[str], empty_message: str = "1. None") -> str:
     if not items:
         return empty_message
     return "\n".join(f"{index}. {item}" for index, item in enumerate(items, start=1))
@@ -299,28 +299,28 @@ def render_entry_markdown(payload: dict[str, Any], file_name: str) -> str:
 
     if entry_type == "note":
         sections = common_prefix + [
-            "## 为什么值得记录",
-            str(payload.get("noteReason", "")).strip() or "（缺失）",
+            "## Why Worth Recording",
+            str(payload.get("noteReason", "")).strip() or "(missing)",
             "",
-            "## 需要注意",
+            "## Key Points",
             render_bullets(ensure_list(payload.get("noteContent")) or ensure_list(payload.get("rules"))),
             "",
-            "## 建议行动",
+            "## Suggested Actions",
             render_bullets(ensure_list(payload.get("noteActionItems")) or ensure_list(payload.get("preventionChecklist"))),
             "",
-            "## 来源上下文",
-            str(payload.get("noteContext", "")).strip() or str(payload.get("originalPrompt", "")).strip() or "（缺失）",
+            "## Source Context",
+            str(payload.get("noteContext", "")).strip() or str(payload.get("originalPrompt", "")).strip() or "(missing)",
             "",
-            "## 已经确认的稳定规则",
+            "## Confirmed Stable Rules",
             render_bullets(ensure_list(payload.get("rules"))),
             "",
-            "## 已经吃透的点",
+            "## Confirmed Understanding",
             render_bullets(ensure_list(payload.get("confirmedUnderstanding"))),
             "",
-            "## 归档范围判断",
+            "## Scope Reasoning",
             render_bullets(ensure_list(payload.get("scopeReasoning"))),
             "",
-            "## 飞升模式记录",
+            "## Ascended Mode Log",
             render_bullets(
                 [
                     f"ascended_triggered: {payload.get('ascendedTriggered', False)}",
@@ -328,42 +328,42 @@ def render_entry_markdown(payload: dict[str, Any], file_name: str) -> str:
                 ]
             ),
             "",
-            "## 飞升模式检索来源",
+            "## Ascended Mode Knowledge Sources",
             render_bullets(ensure_list(payload.get("knowledgeSourcesReviewed"))),
             "",
-            "## 相关原始问题",
-            str(payload.get("originalPrompt", "")).strip() or "（缺失）",
+            "## Original Prompt",
+            str(payload.get("originalPrompt", "")).strip() or "(missing)",
             "",
-            "## 相关回答或方案",
+            "## Related Reply or Solution",
             str(payload.get("finalReply", "")).strip()
             or str(payload.get("originalReply", "")).strip()
-            or "（缺失）",
+            or "(missing)",
             "",
-            "## 项目记忆增量",
+            "## Project Memory Delta",
             render_bullets(ensure_list(payload.get("projectMemoryDelta"))),
             "",
-            "## 全局记忆增量",
+            "## Global Memory Delta",
             render_bullets(ensure_list(payload.get("globalMemoryDelta"))),
         ]
         return "\n".join(sections)
 
     sections = common_prefix + [
-        "## 这次到底错在哪里",
+        "## What Went Wrong",
         render_bullets(ensure_list(payload.get("whatWentWrong"))),
         "",
-        "## 以后必须遵守",
+        "## Rules to Follow",
         render_bullets(ensure_list(payload.get("rules"))),
         "",
-        "## 已经纠正并吃透的点",
+        "## Confirmed Understanding",
         render_bullets(ensure_list(payload.get("confirmedUnderstanding"))),
         "",
-        "## 下次开始前自检",
+        "## Pre-flight Checklist",
         render_bullets(ensure_list(payload.get("preventionChecklist"))),
         "",
-        "## 归档范围判断",
+        "## Scope Reasoning",
         render_bullets(ensure_list(payload.get("scopeReasoning"))),
         "",
-        "## 飞升模式记录",
+        "## Ascended Mode Log",
         render_bullets(
             [
                 f"ascended_triggered: {payload.get('ascendedTriggered', False)}",
@@ -371,28 +371,28 @@ def render_entry_markdown(payload: dict[str, Any], file_name: str) -> str:
             ]
         ),
         "",
-        "## 飞升模式检索来源",
+        "## Ascended Mode Knowledge Sources",
         render_bullets(ensure_list(payload.get("knowledgeSourcesReviewed"))),
         "",
-        "## 原始问题",
-        str(payload.get("originalPrompt", "")).strip() or "（缺失）",
+        "## Original Prompt",
+        str(payload.get("originalPrompt", "")).strip() or "(missing)",
         "",
-        "## 原始回答",
-        str(payload.get("originalReply", "")).strip() or "（缺失）",
+        "## Original Reply",
+        str(payload.get("originalReply", "")).strip() or "(missing)",
         "",
-        "## 用户纠错反馈",
-        str(payload.get("correctionFeedback", "")).strip() or "（缺失）",
+        "## User Correction Feedback",
+        str(payload.get("correctionFeedback", "")).strip() or "(missing)",
         "",
-        "## 追纠记录",
+        "## Follow-up Corrections",
         render_numbered(ensure_list(payload.get("followupCorrections"))),
         "",
-        "## 最终正确回答",
-        str(payload.get("finalReply", "")).strip() or "（缺失）",
+        "## Final Corrected Reply",
+        str(payload.get("finalReply", "")).strip() or "(missing)",
         "",
-        "## 项目记忆增量",
+        "## Project Memory Delta",
         render_bullets(ensure_list(payload.get("projectMemoryDelta"))),
         "",
-        "## 全局记忆增量",
+        "## Global Memory Delta",
         render_bullets(ensure_list(payload.get("globalMemoryDelta"))),
     ]
     return "\n".join(sections)
@@ -449,16 +449,16 @@ def write_catalog(catalog_path: Path, catalog: list[dict[str, Any]]) -> None:
 def render_index(entries: list[dict[str, Any]], scope_label: str, entry_type: str) -> str:
     filtered = [entry for entry in entries if normalize_entry_type(entry.get("entryType")) == entry_type]
     header = [
-        f"# {scope_label}{entry_label(entry_type)}索引",
+        f"# {scope_label} {entry_label(entry_type)} Index",
         "",
         f"- updated_at: {utc_now()}",
         f"- total_entries: {len(filtered)}",
-        "- note: 只展示当前仍可回放的结构化条目",
+        "- note: Only shows entries that can still be replayed",
         "",
-        "## 条目",
+        "## Entries",
     ]
     if not filtered:
-        header.append("- 暂无")
+        header.append("- None")
         return "\n".join(header)
 
     for entry in filtered:
@@ -726,10 +726,8 @@ def build_scholar_message(entry: dict[str, Any]) -> str:
     title = trim_scholar_hint(entry.get("title"), limit=48)
     guidance = build_scholar_guidance(entry)
     if not guidance:
-        return f'历史提醒：这个任务和“{title}”高度相关，这次先复用这条经验。'
-    if guidance.startswith(("先", "先把", "优先", "避免", "检查", "确认")):
-        return f'历史提醒：这个任务和“{title}”高度相关，这次{guidance}。'
-    return f'历史提醒：这个任务和“{title}”高度相关，这次先{guidance}。'
+        return f'History reminder: This task is closely related to “{title}”. Reuse this lesson.'
+    return f'History reminder: This task is closely related to “{title}”. {guidance}.'
 
 
 def classify_scholar_confidence(results: list[dict[str, Any]]) -> str:
@@ -806,9 +804,9 @@ def select_memory_entries(
 
     for item in deferred:
         if item["_staleCandidate"]:
-            item["_deferredReason"] = "长期未命中且最近没有被重新检索，暂时移出缓存"
+            item["_deferredReason"] = "Long inactive with no recent hits; temporarily moved out of cache"
         else:
-            item["_deferredReason"] = "当前缓存已超过阈值，暂时保留在详细条目中"
+            item["_deferredReason"] = "Cache threshold exceeded; retained in detailed archive only"
 
     return active, deferred
 
@@ -844,7 +842,7 @@ def build_deferred_candidates(deferred_entries: list[dict[str, Any]], limit: int
     items: list[str] = []
     for entry in deferred_entries[:limit]:
         label = entry_label(normalize_entry_type(entry.get("entryType")))
-        items.append(f"{entry['title']}（{label}，score={entry['_memoryScore']}）：{entry['_deferredReason']}")
+        items.append(f"{entry['title']} ({label}, score={entry['_memoryScore']}): {entry['_deferredReason']}")
     return items
 
 
@@ -857,11 +855,11 @@ def build_memory_markdown(
     stale_days: int,
     reason: str,
 ) -> str:
-    title = "项目记忆" if kind == "project" else "全局记忆"
-    rules_title = "当前稳定规则" if kind == "project" else "通用稳定规则"
-    notes_title = "当前注意事项" if kind == "project" else "通用注意事项"
-    understood_title = "已经吃透" if kind == "project" else "通用已吃透"
-    risks_title = "高风险提醒" if kind == "project" else "通用高风险提醒"
+    title = "Project Memory" if kind == "project" else "Global Memory"
+    rules_title = "Stable Rules" if kind == "project" else "Global Stable Rules"
+    notes_title = "Active Notes" if kind == "project" else "Global Active Notes"
+    understood_title = "Confirmed Understanding" if kind == "project" else "Global Confirmed Understanding"
+    risks_title = "High-Risk Reminders" if kind == "project" else "Global High-Risk Reminders"
     rules = collect_section_items(kind, active_entries, "rules")
     notes = collect_section_items(kind, active_entries, "notes")
     understood = collect_section_items(kind, active_entries, "understood")
@@ -876,7 +874,7 @@ def build_memory_markdown(
         f"- deferred_entries: {len(deferred_entries)}\n"
         f"- memory_threshold: {threshold}\n"
         f"- stale_after_days: {stale_days}\n"
-        "- cache_policy: 优先保留最近命中、最近检索、仍然稳定有效的内容；旧且低命中的内容暂时退出缓存，但仍保留在详细条目里\n\n"
+        "- cache_policy: Prefer recently hit, recently retrieved, and still stable entries; old low-hit entries are deferred from cache but kept in detailed archive\n\n"
         f"## {rules_title}\n"
         f"{render_bullets(rules)}\n\n"
         f"## {notes_title}\n"
@@ -885,9 +883,9 @@ def build_memory_markdown(
         f"{render_bullets(understood)}\n\n"
         f"## {risks_title}\n"
         f"{render_bullets(risks)}\n\n"
-        "## 暂时遗忘候选\n"
+        "## Deferred Candidates\n"
         f"{render_bullets(deferred)}\n\n"
-        "## 最近一次刷新原因\n"
+        "## Last Refresh Reason\n"
         f"- {reason}\n"
     )
 
@@ -967,7 +965,7 @@ def refresh_store_memory(
     write_text(Path(store["memory_path"]), memory_content)
     memory_state = build_memory_state(kind, active_entries, deferred_entries, threshold, stale_days, reason)
     write_json(Path(store["memory_state_path"]), memory_state)
-    rewrite_indices(store, catalog, "项目级" if kind == "project" else "全局级")
+    rewrite_indices(store, catalog, "Project" if kind == "project" else "Global")
     return {
         "memory_path": store["memory_path"],
         "memory_state_path": store["memory_state_path"],
@@ -1066,7 +1064,7 @@ def archive_to_store(
     write_text(case_path, render_entry_markdown(payload, file_name))
 
     catalog = append_entry(Path(store["catalog_path"]), payload, file_name)
-    scope_label = "项目级" if kind == "project" else "全局级"
+    scope_label = "Project" if kind == "project" else "Global"
     rewrite_indices(store, catalog, scope_label)
 
     memory_result = refresh_store_memory(
@@ -1074,7 +1072,7 @@ def archive_to_store(
         base,
         threshold,
         stale_days,
-        reason=f"新增{entry_label(entry_type)}《{payload['title']}》后刷新缓存记忆",
+        reason=f"Cache refreshed after archiving {entry_label(entry_type)}: {payload['title']}",
         memory_override=memory_override,
     )
 
@@ -1174,7 +1172,7 @@ def consolidate_scope(
 def consolidate_command(args: argparse.Namespace) -> int:
     project_root = Path(args.project_root).resolve()
     result: dict[str, Any] = {"host": args.host, "scope": args.scope}
-    reason = args.reason or "执行 consolidate，按缓存阈值与命中情况重写记忆"
+    reason = args.reason or "Consolidate: rebuilt memory from cache threshold and hit metrics"
     if args.scope in {"project", "both"}:
         result["project"] = consolidate_scope(
             args.host,
@@ -1223,7 +1221,7 @@ def touch_command(args: argparse.Namespace) -> int:
             base,
             args.memory_threshold,
             args.stale_days,
-            reason=f"记录缓存命中事件（{args.kind}）后刷新记忆",
+            reason=f"Cache refreshed after recording {args.kind} event",
         )
         result[store_scope] = {
             "updated_entries": updated_count,
@@ -1260,7 +1258,7 @@ def load_scope_context(
             base,
             threshold,
             stale_days,
-            reason="飞升模式读取全部错题与记事本后刷新缓存记忆",
+            reason="Cache refreshed after ascended mode full retrieval",
         )
         catalog = load_catalog(catalog_path)
 
@@ -1352,7 +1350,7 @@ def context_command(args: argparse.Namespace) -> int:
         "scope": args.scope,
         "generatedAt": utc_now(),
         "markRetrieval": args.mark_retrieval,
-        "goal": "为飞升模式导出项目级/全局级错题、记事本与缓存记忆上下文",
+        "goal": "Export project/global mistakes, notes, and cached memory context for ascended mode",
     }
     if args.scope in {"project", "both"}:
         if query_text:
