@@ -108,15 +108,15 @@
 5. 记忆达到阈值后，要开始整理和暂时遗忘低命中内容
 ## Scholar Preflight
 
-鍦ㄦ柊鐨勬櫘閫氫换鍔″紑濮嬪墠锛屽鏋滃綋鍓嶄笉鍦ㄧ籂閿欓棴鐜垨 Ascended Mode 閲岋紝鍏堣繍琛岋細
+在新的普通任务开始前，如果当前不在 `mistake` 纠错闭环、`note` 流程或 `Ascended Mode` 里，先运行轻量预检：
 
 ```bash
 python scripts/mistakebook_cli.py scholar --host vscode --project-root . --scope both --text "<当前任务>"
 ```
 
-鍙湁褰?`shouldInject = true` 鏃讹紝鎵嶅湪姝ｅ紡鍥炵瓟鍓嶈緭鍑轰竴琛屽巻鍙叉彁閱掋€傚鏋滃綋鍓嶅凡杩涘叆绾犻敊闂幆鎴?Ascended Mode锛屽垯蹇呴』闈欓粯锛屼笉瑕佺户缁繍琛?`scholar`銆?
+只有当 `scholar` 返回 `shouldInject = true` 时，才在正式回答前输出一行历史提醒；如果返回 `shouldInject = false`，保持静默，不要展示 query 结果。进入纠错闭环、`note` 流程或 `Ascended Mode` 后，不要再运行 `scholar`。
 
-濡傛灉鐢ㄦ埛璇?`scholar off` / `scholar on`锛屽彲浠ュ湪褰撳墠浼氳瘽涓存椂鍏抽棴鎴栨仮澶嶉妫€銆傚鏋滅敤鎴疯姹傞暱鏈熷叧闂垨寮€鍚紝鎵ц锛?
+如果用户说 `scholar off` / `scholar on`，可以关闭或恢复预检；长期配置使用：
 
 ```bash
 python scripts/mistakebook_cli.py config --scholar off

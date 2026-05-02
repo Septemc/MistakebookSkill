@@ -125,7 +125,32 @@ Maintain at least this information until archiving is complete:
 
 If context compaction occurs, prioritize checkpointing this information to `~/.mistakebook/runtime-journal.md`.
 
-## `mistake` Loop
+## 生命周期 hook
+
+宿主支持 hook 时，优先使用 `scripts/lifecycle_hooks.py` 统一处理运行态，而不是把状态恢复逻辑散落在长 prompt 里：
+
+1. `UserPromptSubmit`
+   - 使用 `scripts/trigger_report.py` 输出结构化 trigger report
+   - correction、ascended、scholar preflight 都返回 `hookSpecificOutput.additionalContext`
+   - 不再依赖不可测试的长 prompt 片段
+2. `PreCompact`
+   - 读取 `runtime-state.json`
+   - 如果状态是 `armed`、`pending_review`、`followup_needed` 或 `summarizing`，写入 `~/.mistakebook/runtime-journal.md`
+3. `PostCompact`
+   - 读取最近的 `runtime-journal.md`
+   - 如果宿主提供 compact summary，把摘要追加回 journal
+   - 把 `case_id`、`status` 和“不要提前归档”的约束重新注入上下文
+4. `SessionEnd`
+   - 保存未完成闭环
+   - 如果仍在 `summarizing`，提醒当前归档尚未确认，必须等待 `userConfirmed=true`
+5. `SubagentStart`
+   - 对子任务运行轻量 `scholar`
+   - 只有 `evidencePacket.confidence = high` 且误注入风险可接受时才注入项目记忆
+6. `SubagentStop`
+   - 对实际使用过的 case 执行 `touch --kind hit`
+   - 让 `hitCount`、`lastHitAt` 和缓存记忆能够反映子代理使用效果
+
+## mistake 闭环
 
 ### 1. Entry
 
@@ -239,10 +264,20 @@ Must include at minimum:
 1. `entryType`
 2. `title`
 3. `summary`
-4. `scopeDecision`
-5. `scopeReasoning`
-6. `rules`
-7. `confirmedUnderstanding`
+4. `userConfirmed`
+5. `scopeDecision`
+6. `scopeReasoning`
+7. `rules`
+8. `confirmedUnderstanding`
+
+如果后续调用 CLI 时带 `--runtime-state-file`，并且 runtime state 里已有 `case_id`，payload 必须提供相同的 `caseId`。
+
+编码完整性要求：
+
+1. 归档前检查 payload 中不能出现连续四个以上问号、`U+FFFD` replacement character 或私用区字符。
+2. 在 Windows / PowerShell / Codex `shell_command` 中，不要把中文 payload 直接写进命令文本；传输层一旦把中文改成连续问号，后续无法还原。
+3. 如需通过命令传 payload，优先使用 UTF-8 `--payload-file`；必须走 stdin 时，使用 ASCII `\u` 转义 JSON。
+4. 如果 CLI 报 `payload contains likely encoding corruption`，停止归档，重新生成未损坏的 payload，不要手工把问号写进 memory。
 
 For `mistake`, additionally include:
 
@@ -311,7 +346,24 @@ Default policy:
 3. Long-inactive, low-hit entries temporarily exit the cache
 4. Detailed entries are always preserved in `failures/` and `notes/`
 
-## Host and Paths
+## 行为评测
+
+改动触发词、归档契约、检索、compact 恢复或宿主入口后，优先运行统一评测：
+
+```bash
+python scripts/eval_harness.py --root .
+```
+
+评测必须覆盖：
+
+1. `trigger_recall`
+2. `trigger_precision`
+3. `archive_contract`
+4. `retrieval_quality`
+5. `compact_recovery`
+6. `cross_host`
+
+## 宿主与路径
 
 Default directories:
 
@@ -339,19 +391,20 @@ If the host can only write to a skill/plugin directory, redirect the global root
 
 ## Scholar Preflight
 
-Before a new normal task begins, if the current session is not in `mistake` correction loop, `note` flow, or `ascended` mode, run a lightweight preflight check:
+在新的普通任务开始前，如果当前不在 `mistake` 纠错闭环、`note` 流程或 `ascended` 模式里，先运行轻量预检：
 
 ```bash
 python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<current task>"
 ```
 
-Execution rules:
+执行规则：
 
-1. Only output a history reminder before the substantive answer when `scholar` returns `shouldInject = true`
-2. If `shouldInject = false`, stay silent and do not show query results to the user
-3. Stop running `scholar` once entering correction loop or Ascended Mode
-4. `scholar` is responsible for "pre-answer mistake prevention"; `ascended` is responsible for "post-failure escalation" — do not conflate the two into a single heavy mode
-5. If the user says `scholar off` or `scholar on`, you can temporarily disable or re-enable preflight in the current session; for long-term changes, run:
+1. 只有当 `scholar` 返回 `shouldInject = true` 时，才在正式回答前输出一行历史提醒。
+2. 如果返回 `shouldInject = false`，必须保持静默，不要把 query 结果原样展示给用户。
+3. 判断是否注入时，优先看 `evidencePacket.confidence`、`evidencePacket.whyMatched` 和 `evidencePacket.riskOfFalsePositive`。
+4. 一旦进入纠错闭环或 Ascended Mode，就停止运行 `scholar`。
+5. `scholar` 的职责是“回答前避错”，`ascended` 的职责是“失败后升级处置”，两者不能混成同一个重模式。
+6. 如果用户说 `scholar off` 或 `scholar on`，可以在当前会话中临时关闭或恢复预检；如果用户要求长期关闭或开启，再执行：
 
 ```bash
 python scripts/mistakebook_cli.py config --scholar off

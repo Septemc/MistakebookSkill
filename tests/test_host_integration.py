@@ -6,6 +6,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOKS_PATH = REPO_ROOT / "hooks" / "hooks.json"
 SCHOLAR_HOOK_PATH = REPO_ROOT / "hooks" / "scholar-preflight-trigger.sh"
+TRIGGER_REPORT_PATH = REPO_ROOT / "scripts" / "trigger_report.py"
 CODEX_COMMAND_PATH = REPO_ROOT / "commands" / "scholar.md"
 CODEX_SKILL_ROOT = REPO_ROOT / "codex"
 CODEX_INSTALL_DOC_PATH = REPO_ROOT / ".codex" / "INSTALL.md"
@@ -31,14 +32,15 @@ class HostIntegrationTests(unittest.TestCase):
 
     def test_scholar_preflight_hook_checks_config_and_emits_lightweight_instruction(self) -> None:
         script_text = SCHOLAR_HOOK_PATH.read_text(encoding="utf-8")
+        report_text = TRIGGER_REPORT_PATH.read_text(encoding="utf-8")
 
-        self.assertIn('CONFIG="${HOME:-~}/.mistakebook/config.json"', script_text)
-        self.assertIn('SCHOLAR_ENABLED=$(read_config_bool "scholar" "true")', script_text)
-        self.assertIn('if [ "$SCHOLAR_ENABLED" != "true" ]; then', script_text)
-        self.assertIn("[Mistakebook Scholar Preflight]", script_text)
-        self.assertIn("python scripts/mistakebook_cli.py scholar --host claude", script_text)
-        self.assertIn("fresh normal task", script_text)
-        self.assertIn("Do not run scholar", script_text)
+        self.assertIn("trigger_report.py", script_text)
+        self.assertIn("scholar-preflight", script_text)
+        self.assertIn('read_config_bool("scholar", True)', report_text)
+        self.assertIn("[Mistakebook Scholar Preflight]", report_text)
+        self.assertIn("python scripts/mistakebook_cli.py scholar --host claude", report_text)
+        self.assertIn("fresh normal task", report_text)
+        self.assertIn("Do not run scholar", report_text)
 
     def test_explicit_scholar_entrypoints_exist_for_codex_and_vscode(self) -> None:
         codex_command = CODEX_COMMAND_PATH.read_text(encoding="utf-8")

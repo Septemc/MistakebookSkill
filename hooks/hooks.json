@@ -1,9 +1,9 @@
 {
-  "description": "Mistakebook hooks: correction detection, notebook capture hints, Ascended Mode escalation, compaction checkpoint, and session restore",
+  "description": "Mistakebook hooks: correction detection, notebook capture hints, Ascended Mode escalation, scholar preflight, compaction checkpoint, session restore, subagent memory injection, and hit metrics",
   "hooks": {
     "UserPromptSubmit": [
       {
-        "matcher": "你这里错了|这不对|重新改|我来纠正你|我教你一遍|你又犯同样的错|还没改对|你没有吃透|按我说的改|这个回答有问题|这个地方你改坏了|启动错题集|写入错题集|写入记事本|记一下这个事项|这个不是错题但要记住|mistakebook",
+        "matcher": "你这里错了|这不对|重新改|我来纠正你|我教你一遍|你又犯同样的错|还没改对|你没有吃透|按我说的改|这个回答有问题|这个地方你改坏了|你还是没明白我的意思|启动错题集|写入错题集|写入记事本|记一下这个事项|这个不是错题但要记住|mistakebook",
         "hooks": [
           {
             "type": "command",
@@ -13,7 +13,7 @@
         ]
       },
       {
-        "matcher": "你需要根据你见过最有效的方法来处理这个问题|/ascended|ascended",
+        "matcher": "你需要根据你见过最有效的方法来处理这个问题|用你见过最有效的方法|见过最有效的方法|我都纠正你两次了还是不对|你已经改了两轮还是没抓到重点|/ascended|ascended",
         "hooks": [
           {
             "type": "command",
@@ -38,8 +38,57 @@
         "matcher": "*",
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "[Mistakebook PreCompact - State Checkpoint]\n\nCheck FIRST whether mistakebook mode was active in this session. Look for any of these exact markers in your recent output:\n- <Mistakebook.Skill>I will now correct my mistake based on your feedback, continue correcting until completion, and archive it to my mistakebook.\n- Have I fully understood the issue and successfully corrected the mistake? If not, please teach me again. (If I have completed the correction, please let me know so I can archive it to my mistakebook.)\n- If this item is worth long-term attention, you can also tell me \"write to notebook\" and I will archive it to the notebook and refresh my memory.\n- I will now handle this problem using the most effective method I have seen. I will search all my knowledge bases. I am ready!\n\nIf none of these markers appear, do nothing.\n\nIf mistakebook mode WAS active, immediately write a checkpoint to `~/.mistakebook/runtime-journal.md` before compaction. Include:\n\n```markdown\n# Mistakebook Runtime Journal\n\n## Timestamp\n{current ISO timestamp}\n\n## Runtime State\n- status: {armed|pending_review|followup_needed|summarizing}\n- entry_type: {mistake|note}\n- mode: {normal|ascended}\n- host: {codex|claude|vscode|generic}\n- project_root: {absolute path if known}\n- case_id: {current case id}\n- session_id: {if known}\n- trace_id: {if known}\n- rejection_count: {number}\n- correction_attempt_count: {number}\n- ascended_trigger_reason: {manual phrase | /ascended | auto after repeated failed corrections | n/a}\n\n## Original Prompt\n{user original prompt}\n\n## Original Reply Summary\n{short summary of the original wrong reply or note draft}\n\n## Correction / Note Feedback So Far\n{merged correction feedback and follow-up chain}\n\n## Latest Fixed Reply Summary\n{short summary of your latest corrected reply or note summary}\n\n## Scope Guess\n{project|global|both plus reason}\n\n## Knowledge Sources Reviewed\n{project failures / project notes / project memory / global failures / global notes / global memory / current repo files / current repo docs / other}\n\n## Next Expected Action\n{what should happen next}\n```\n\nAfter writing, output exactly:\n> [Mistakebook Checkpoint] Correction state saved to ~/.mistakebook/runtime-journal.md"
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle-pre-compact.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle-post-compact.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle-subagent-start.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle-subagent-stop.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/lifecycle-session-end.sh",
+            "timeout": 5
           }
         ]
       }

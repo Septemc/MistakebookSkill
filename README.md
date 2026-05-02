@@ -33,25 +33,6 @@
 
 ---
 
-## 这次版本的核心升级
-
-当前版本已经从“单一错题集”升级成统一模型：
-
-1. 支持两类条目
-   - `mistake`：已经完成纠错、值得复盘的错误案例
-   - `note`：不一定是错误，但值得长期保留的主动事项
-2. 每次归档都会刷新
-   - 项目记忆
-   - 全局记忆
-3. 记忆不是流水账，而是缓存
-   - 初期可以接近全量保留
-   - 达到阈值后开始整理和暂时遗忘
-   - 详细条目仍保留在 `failures/` 和 `notes/`
-4. 飞升模式不再只看错题
-   - 还会检索记事本
-   - 检索记忆缓存状态
-   - 检索当前真实文件、真实输出、真实文档
-
 ## 这个项目解决什么问题
 
 普通 Agent 在被用户纠正时，常见问题不是“道歉不够诚恳”，而是：
@@ -168,10 +149,11 @@ Agent 会进入学霸模式预检。
 4. 检索全局级错题集
 5. 检索全局级记事本
 6. 检索全局级记忆
-7. 按字段命中和 memory score 对候选案例排序
-8. 只返回最相关的高置信结果
-9. 只在 `shouldInject = true` 时输出一行 `message`
-10. 不写归档、不刷新 memory、也不增加 retrieval 记账
+7. 按字段命中、SQLite FTS/BM25 和 memory score 对候选案例排序
+8. 返回 `evidencePacket`，说明 `matchedCaseIds`、`whyMatched`、`confidence` 和 `riskOfFalsePositive`
+9. 只返回最相关的高置信结果
+10. 只在 `shouldInject = true` 时输出一行 `message`
+11. 不写归档、不刷新 memory、也不增加 retrieval 记账
 
 学霸模式和飞升模式的职责边界：
 
@@ -221,6 +203,12 @@ Agent 会进入学霸模式预检。
   - Codex scholar skill-chip 包装入口
 - [scripts/mistakebook_cli.py](./scripts/mistakebook_cli.py)
   - 初始化、归档、命中、整理、上下文导出 CLI
+- [scripts/lifecycle_hooks.py](./scripts/lifecycle_hooks.py)
+  - PreCompact / PostCompact / SessionEnd / SubagentStart / SubagentStop 生命周期入口
+- [scripts/trigger_report.py](./scripts/trigger_report.py)
+  - UserPromptSubmit 的纠错、飞升、scholar 结构化 trigger report
+- [scripts/eval_harness.py](./scripts/eval_harness.py)
+  - 统一行为评测入口，覆盖触发、归档契约、检索质量、压缩恢复和跨宿主矩阵
 - [commands/mistakebook.md](./commands/mistakebook.md)
   - `/mistakebook` 统一入口
 - [commands/scholar.md](./commands/scholar.md)
@@ -231,6 +219,8 @@ Agent 会进入学霸模式预检。
   - 飞升模式手动入口
 - [hooks/scholar-preflight-trigger.sh](./hooks/scholar-preflight-trigger.sh)
   - Claude 风格宿主的 scholar 轻量预检 hook
+- [hooks/lifecycle-pre-compact.sh](./hooks/lifecycle-pre-compact.sh)
+  - Claude 风格宿主的运行态 checkpoint hook；同目录还有 PostCompact、SessionEnd、SubagentStart、SubagentStop wrapper
 
 ## 存储结构
 
@@ -298,8 +288,9 @@ python scripts/mistakebook_cli.py bootstrap --host codex --project-root .
 
 ```bash
 python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-file payload.json
-python scripts/mistakebook_cli.py archive --host codex --project-root . --payload '{"entryType":"note","title":"...","summary":"..."}'
+python scripts/mistakebook_cli.py archive --host codex --project-root . --payload '{"entryType":"note","title":"...","summary":"...","userConfirmed":true}'
 python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+python scripts/mistakebook_cli.py archive --host codex --project-root . --runtime-state-file path/to/runtime_state.json --payload-stdin
 ```
 
 归档输入三选一：
@@ -313,7 +304,17 @@ python scripts/mistakebook_cli.py archive --host codex --project-root . --payloa
 1. `entryType = mistake`
 2. `entryType = note`
 
+归档 payload 必须包含 `"userConfirmed": true`。这个字段表示当前条目已经得到用户明确确认，CLI 会拒绝未确认 payload，防止提前污染错题集或记事本。
+
+如果同时传入 `--runtime-state-file`，CLI 只允许 `status=summarizing` 的状态进入归档；当 runtime state 里已有 `case_id` 时，payload 必须提供相同的 `caseId`。
+
 推荐在 Codex 中优先使用 `--payload-stdin`，这样不需要额外写临时 JSON 文件。
+
+编码安全约束：
+
+1. 在 Windows / PowerShell / Codex `shell_command` 场景里，不要把中文 payload 直接塞进命令文本；如果传输层已经把中文变成连续问号，CLI 无法还原原文。
+2. 优先使用 UTF-8 的 `--payload-file`，或者用 ASCII `\u` 转义 JSON 走 `--payload-stdin`。
+3. CLI 会在归档前拒绝疑似乱码 payload，包括连续四个以上问号、`U+FFFD` replacement character、私用区字符，避免污染 `PROJECT_MEMORY.md`、`GLOBAL_MEMORY.md` 和详细条目。
 
 #### `mistake` 最小模板
 
@@ -322,6 +323,7 @@ python scripts/mistakebook_cli.py archive --host codex --project-root . --payloa
   "entryType": "mistake",
   "title": "一句话标题",
   "summary": "一句话总结",
+  "userConfirmed": true,
   "scopeDecision": "project",
   "scopeReasoning": ["为什么归到这个 scope"],
   "rules": ["以后必须遵守什么"],
@@ -339,6 +341,7 @@ python scripts/mistakebook_cli.py archive --host codex --project-root . --payloa
   "entryType": "note",
   "title": "一句话标题",
   "summary": "一句话总结",
+  "userConfirmed": true,
   "scopeDecision": "project",
   "scopeReasoning": ["为什么归到这个 scope"],
   "rules": ["以后必须注意什么"],
@@ -356,6 +359,7 @@ cat <<'EOF' | python scripts/mistakebook_cli.py archive --host codex --project-r
   "entryType": "mistake",
   "title": "没有先读真实实现",
   "summary": "修改前没有先核对真实脚本实现。",
+  "userConfirmed": true,
   "scopeDecision": "both",
   "scopeReasoning": ["当前项目里需要复盘", "这个规则跨项目也成立"],
   "rules": ["修改协议前先读真实实现"],
@@ -370,19 +374,8 @@ EOF
 #### PowerShell 示例
 
 ```powershell
-@'
-{
-  "entryType": "note",
-  "title": "新增事项要同步刷新记忆",
-  "summary": "记事本条目归档后要同步更新 memory。",
-  "scopeDecision": "project",
-  "scopeReasoning": ["这是当前项目内的实现约束"],
-  "rules": ["新增 note 后同步刷新 memory"],
-  "confirmedUnderstanding": ["记事本和错题都属于统一记忆体系"],
-  "noteReason": "这是长期有效的实现约束",
-  "noteContent": ["归档 note 后同步刷新项目记忆"]
-}
-'@ | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+$payload = '{"entryType":"note","title":"\u4e2d\u6587\u8bb0\u4e8b","summary":"\u901a\u8fc7 ASCII Unicode escape \u4f20\u8f93\u4e2d\u6587","userConfirmed":true,"scopeDecision":"project","scopeReasoning":["\u907f\u514d PowerShell \u4f20\u8f93\u5c42\u6539\u5199\u5b57\u7b26"],"rules":["Markdown \u5199\u5165\u5fc5\u987b\u4fdd\u6301 UTF-8"],"confirmedUnderstanding":["\u4e0d\u628a\u5df2\u7ecf\u53d8\u6210\u95ee\u53f7\u7684 payload \u5f52\u6863"],"noteReason":"\u9632\u6b62 PROJECT_MEMORY.md \u4e71\u7801","noteContent":["\u4f7f\u7528 UTF-8 \u6587\u4ef6\u6216 ASCII \\u JSON"]}'
+$payload | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
 ```
 
 ### 3. 统一检索接口
@@ -391,7 +384,7 @@ EOF
 python scripts/mistakebook_cli.py query --host codex --project-root . --scope both --text "先读真实实现再改文档" --limit 3
 ```
 
-`query` 会从 project / global 的 `catalog` 中找出与当前问题最相关的 Top-N 条目，先用字段命中做召回，再叠加现有 memory score 做排序。它是后续学霸模式和飞升模式裁剪的统一底座。
+`query` 会从 project / global 的 `catalog` 中找出与当前问题最相关的 Top-N 条目，先用字段命中和 SQLite FTS/BM25 做召回，再叠加现有 memory score 做排序。输出会包含 `evidencePacket`，用于解释是否应注入、置信度、命中的 case、命中原因和误注入风险；它是后续学霸模式和飞升模式裁剪的统一底座。
 
 ### 4. 记录命中或检索
 
@@ -410,7 +403,7 @@ python scripts/mistakebook_cli.py consolidate --host codex --project-root . --sc
 
 ```bash
 python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
-python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --query "鍏堣鐪熷疄瀹炵幇鍐嶆敼鏂囨。" --limit 3 --mark-retrieval
+python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --query "先读真实实现再改文档" --limit 3 --mark-retrieval
 ```
 
 ### 7. 查看状态
@@ -434,13 +427,51 @@ python scripts/mistakebook_cli.py config --auto-detect on
 python scripts/mistakebook_cli.py config --auto-detect off
 ```
 
-### 10. 评估触发规则
+### 10. 生命周期 hook 演练
+
+```bash
+python scripts/trigger_report.py correction
+python scripts/trigger_report.py ascended
+python scripts/trigger_report.py scholar-preflight
+python scripts/lifecycle_hooks.py pre-compact --state-file ~/.mistakebook/runtime-state.json
+python scripts/lifecycle_hooks.py post-compact --compact-summary-file compact-summary.md
+python scripts/lifecycle_hooks.py session-end --state-file ~/.mistakebook/runtime-state.json
+python scripts/lifecycle_hooks.py subagent-start --host codex --project-root . --scope both --task-text "<子任务>"
+python scripts/lifecycle_hooks.py subagent-stop --host codex --project-root . --scope both --case-id <case-id> --kind hit
+```
+
+这些入口把宿主生命周期收束成结构化 JSON hook 输出：压缩前保存 `runtime-journal.md`，压缩后可读取 compact summary 并刷新 runtime journal，SessionEnd 保存未完成闭环，子代理启动前注入高置信项目记忆，子代理结束后回写命中统计。
+
+### 11. 评估触发规则
 
 ```bash
 python scripts/eval_triggers.py
 ```
 
 这会直接读取 `hooks/hooks.json` 里的 `UserPromptSubmit` matcher，并对 `evals/trigger-prompts/` 下的样本做回归检查。只要有任一样本不符合预期，脚本就会以非 `0` 退出码结束。
+
+### 12. 统一行为评测
+
+```bash
+python scripts/eval_harness.py --root .
+python scripts/eval_harness.py --root . --json
+python scripts/eval_harness.py --root . --suite retrieval_quality --json
+```
+
+`eval_harness.py` 会把关键行为收束成一份结构化报告：
+
+1. `trigger_recall`
+   - 该触发时是否触发，包括普通纠错和飞升触发
+2. `trigger_precision`
+   - 不该触发时是否保持沉默
+3. `archive_contract`
+   - 未确认 payload 是否被拒绝，`summarizing` 状态下的确认 payload 是否被接受
+4. `retrieval_quality`
+   - `query`、`scholar`、`context --query` 是否把正确 case 排在第一
+5. `compact_recovery`
+   - `PreCompact` / `PostCompact` 是否保留 active case 并刷新 runtime journal
+6. `cross_host`
+   - Codex、Claude 风格 hooks、VSCode 入口是否都保留必要协议连接
 
 ## 推荐工作流
 
@@ -554,28 +585,6 @@ Codex 安装说明见 [`.codex/INSTALL.md`](./.codex/INSTALL.md)。
 4. [vscode/prompts/scholar.prompt.md](./vscode/prompts/scholar.prompt.md)
 5. [vscode/prompts/notebook.prompt.md](./vscode/prompts/notebook.prompt.md)
 6. [vscode/prompts/ascended.prompt.md](./vscode/prompts/ascended.prompt.md)
-
-## 当前已经实现
-
-当前仓库已经具备：
-
-1. `mistake` / `note` 双条目模型
-2. 项目级 / 全局级双层存储
-3. 项目记忆 / 全局记忆缓存
-4. 命中 / 检索统计
-5. `consolidate` 缓存式记忆重写
-6. 飞升模式上下文导出
-7. 多宿主协议镜像
-
-## 后续还可以继续增强
-
-这个版本已经能真实使用，但还有几个方向可继续演进：
-
-1. 增加更细粒度的自动 scope 推断
-2. 增加更完整的 `evals` 回归 runner
-3. 增加更细的命中概率模型
-4. 增加多轮 case 版本演进视图
-5. 为更多宿主补适配层
 
 ## 关于 `reference_code/`
 

@@ -9,6 +9,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from runtime_state import RuntimeStateError, assert_can_archive, load_state, save_state, transition
+except ModuleNotFoundError:
+    from scripts.runtime_state import RuntimeStateError, assert_can_archive, load_state, save_state, transition
+
+try:
+    from retrieval_index import build_retrieval_evidence
+except ModuleNotFoundError:
+    from scripts.retrieval_index import build_retrieval_evidence
+
 
 PROJECT_ROOTS = {
     "codex": ".mistakebook",
@@ -43,6 +53,7 @@ DEFAULT_AUTO_DETECT = True
 DEFAULT_SCHOLAR = True
 ENTRY_TYPES = ("mistake", "note")
 SCHOLAR_PHASES = ("normal", "correction", "ascended")
+QUESTION_MARK_RUN = re.compile(r"\?{4,}")
 
 
 def utc_now() -> str:
@@ -104,6 +115,44 @@ def ensure_bool(value: Any, default: bool = False) -> bool:
     if text in {"0", "false", "no", "off"}:
         return False
     return default
+
+
+def find_text_integrity_issues(value: Any, path: str = "$") -> list[str]:
+    issues: list[str] = []
+    if isinstance(value, str):
+        if "\ufffd" in value:
+            issues.append(f"{path}: replacement character U+FFFD")
+        if any("\ue000" <= char <= "\uf8ff" for char in value):
+            issues.append(f"{path}: private-use character")
+        match = QUESTION_MARK_RUN.search(value)
+        if match:
+            issues.append(f"{path}: question-mark run {match.group(0)!r}")
+        return issues
+
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            issues.extend(find_text_integrity_issues(item, f"{path}[{index}]"))
+        return issues
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_text = str(key).replace("\\", "\\\\").replace(".", "\\.")
+            issues.extend(find_text_integrity_issues(item, f"{path}.{key_text}"))
+        return issues
+
+    return issues
+
+
+def assert_payload_text_integrity(payload: dict[str, Any]) -> None:
+    issues = find_text_integrity_issues(payload)
+    if not issues:
+        return
+    shown = "; ".join(issues[:5])
+    extra = "" if len(issues) <= 5 else f"; ... and {len(issues) - 5} more"
+    raise SystemExit(
+        "payload contains likely encoding corruption; use a UTF-8 payload file "
+        f"or ASCII \\u-escaped JSON before archiving: {shown}{extra}"
+    )
 
 
 def unique_items(items: list[str], limit: int | None = None) -> list[str]:
@@ -395,6 +444,7 @@ def render_entry_markdown(payload: dict[str, Any], file_name: str) -> str:
         f"- trace: {payload.get('traceId', 'n/a')}",
         f"- case_id: {payload.get('caseId', file_name.removesuffix('.md'))}",
         f"- scope: {payload.get('scopeDecision', 'project')}",
+        f"- user_confirmed: {payload.get('userConfirmed', False)}",
         f"- severity: {payload.get('severity', 'n/a')}",
         f"- correction_attempt_count: {payload.get('correctionAttemptCount', 'n/a')}",
         f"- ascended_triggered: {payload.get('ascendedTriggered', False)}",
@@ -521,6 +571,7 @@ def normalize_catalog_entry(entry: dict[str, Any]) -> dict[str, Any]:
     normalized["archivedAt"] = str(normalized.get("archivedAt") or utc_now()).strip()
     normalized["updatedAt"] = str(normalized.get("updatedAt") or normalized["archivedAt"]).strip()
     normalized["scopeDecision"] = str(normalized.get("scopeDecision") or "project").strip()
+    normalized["userConfirmed"] = ensure_bool(normalized.get("userConfirmed"), False)
     normalized["summary"] = str(normalized.get("summary") or "").strip()
     normalized["keywords"] = ensure_list(normalized.get("keywords"))
     normalized["rules"] = ensure_list(normalized.get("rules"))
@@ -594,6 +645,7 @@ def build_catalog_entry(payload: dict[str, Any], file_name: str) -> dict[str, An
             "archivedAt": payload["archivedAt"],
             "updatedAt": utc_now(),
             "scopeDecision": payload["scopeDecision"],
+            "userConfirmed": payload.get("userConfirmed", False),
             "keywords": ensure_list(payload.get("keywords")),
             "summary": payload["summary"],
             "rules": ensure_list(payload.get("rules")),
@@ -726,7 +778,13 @@ def build_query_field_values(entry: dict[str, Any]) -> dict[str, list[str]]:
     return field_values
 
 
-def query_catalog_entry(entry: dict[str, Any], query_text: str, stale_days: int, store_scope: str) -> dict[str, Any] | None:
+def query_catalog_entry(
+    entry: dict[str, Any],
+    query_text: str,
+    stale_days: int,
+    store_scope: str,
+    retrieval_evidence: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     normalized_query = normalize_query_text(query_text)
     terms = extract_query_terms(normalized_query)
     if not normalized_query:
@@ -757,11 +815,23 @@ def query_catalog_entry(entry: dict[str, Any], query_text: str, stale_days: int,
             match_reasons.append(f"{field}:{','.join(term_hits[:3])}")
         matched_terms.extend(term_hits[:4])
 
-    if not any_match:
+    evidence = retrieval_evidence or {}
+    evidence_matched = ensure_bool(evidence.get("matched"), False)
+    if not any_match and not evidence_matched:
         return None
 
     unique_terms = unique_items(matched_terms, limit=12)
     unique_reasons = unique_items(match_reasons, limit=8)
+    evidence_terms = ensure_list(evidence.get("matchedTerms"))
+    evidence_reasons = ensure_list(evidence.get("whyMatched"))
+    retrieval_bonus = ensure_float(evidence.get("retrievalScore"), 0.0)
+    retrieval_bonus = min(6.0, retrieval_bonus * 0.35)
+    why_matched = unique_items(unique_reasons + evidence_reasons, limit=12)
+    if not why_matched and evidence_matched:
+        why_matched = evidence_reasons
+    result_terms = unique_items(unique_terms + evidence_terms, limit=16)
+    retrieval_method = str(evidence.get("retrievalMethod") or "lexical").strip()
+    risk = str(evidence.get("riskOfFalsePositive") or "medium").strip()
     result = {
         "storeScope": store_scope,
         "caseId": decorated["caseId"],
@@ -771,10 +841,19 @@ def query_catalog_entry(entry: dict[str, Any], query_text: str, stale_days: int,
         "relativePath": decorated["relativePath"],
         "scopeDecision": decorated["scopeDecision"],
         "archivedAt": decorated["archivedAt"],
-        "score": round(decorated["_memoryScore"] + lexical_score, 4),
+        "score": round(decorated["_memoryScore"] + lexical_score + retrieval_bonus, 4),
         "memoryScore": decorated["_memoryScore"],
-        "matchedTerms": unique_terms,
-        "matchReasons": unique_reasons,
+        "retrievalScore": round(retrieval_bonus, 4),
+        "retrievalMethod": retrieval_method,
+        "matchedTerms": result_terms,
+        "matchReasons": unique_items(unique_reasons + evidence_reasons, limit=12),
+        "whyMatched": why_matched,
+        "riskOfFalsePositive": risk,
+        "retrievalEvidence": {
+            "bm25Score": ensure_float(evidence.get("bm25Score"), 0.0),
+            "fieldHits": evidence.get("fieldHits", []),
+            "exactKeywordHits": evidence.get("exactKeywordHits", []),
+        },
         "keywords": decorated["keywords"],
         "hitCount": decorated["hitCount"],
         "retrievalCount": decorated["retrievalCount"],
@@ -789,8 +868,10 @@ def query_catalog(
     store_scope: str,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
+    evidence_by_case = build_retrieval_evidence(catalog, query_text, store_scope, QUERY_FIELD_WEIGHTS)
     for entry in catalog:
-        match = query_catalog_entry(entry, query_text, stale_days, store_scope)
+        case_id = str(entry.get("caseId") or "").strip()
+        match = query_catalog_entry(entry, query_text, stale_days, store_scope, evidence_by_case.get(case_id))
         if match is not None:
             results.append(match)
     results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
@@ -844,8 +925,11 @@ def classify_scholar_confidence(results: list[dict[str, Any]]) -> str:
     top_result = results[0]
     second_score = results[1]["score"] if len(results) > 1 else 0.0
     score_gap = top_result["score"] - second_score
-    direct_query_match = any(reason.endswith(":query") for reason in top_result["matchReasons"])
-    strong_support = len(top_result["matchReasons"]) >= 2 or len(top_result["matchedTerms"]) >= 2
+    evidence_reasons = ensure_list(top_result.get("whyMatched")) + ensure_list(top_result.get("matchReasons"))
+    direct_query_match = any(
+        reason.endswith(":query") or reason.startswith("exact_keyword:") for reason in evidence_reasons
+    )
+    strong_support = len(evidence_reasons) >= 2 or len(top_result["matchedTerms"]) >= 2
     dense_lexical_match = len(top_result["matchedTerms"]) >= 3
 
     if (
@@ -860,6 +944,55 @@ def classify_scholar_confidence(results: list[dict[str, Any]]) -> str:
     if top_result["score"] >= 6.0:
         return "low"
     return "none"
+
+
+def summarize_false_positive_risk(results: list[dict[str, Any]], confidence: str) -> str:
+    if not results:
+        return "none"
+    top_result = results[0]
+    risk = str(top_result.get("riskOfFalsePositive") or "medium").strip()
+    if len(results) > 1:
+        score_gap = top_result["score"] - results[1]["score"]
+        if score_gap < 0.8 and risk == "low":
+            risk = "medium"
+    if confidence in {"none", "low"} and risk == "low":
+        risk = "medium"
+    return risk
+
+
+def build_evidence_packet(
+    results: list[dict[str, Any]],
+    confidence: str | None = None,
+    limit: int = 3,
+    should_inject: bool | None = None,
+) -> dict[str, Any]:
+    resolved_confidence = confidence or classify_scholar_confidence(results)
+    risk = summarize_false_positive_risk(results, resolved_confidence)
+    if should_inject is None:
+        should_inject = resolved_confidence == "high" and risk != "high"
+
+    if not results:
+        return {
+            "shouldInject": False,
+            "confidence": "none",
+            "matchedCaseIds": [],
+            "whyMatched": [],
+            "riskOfFalsePositive": "none",
+            "retrievalMethod": "none",
+            "topScore": 0.0,
+        }
+
+    top_result = results[0]
+    why_matched = unique_items(ensure_list(top_result.get("whyMatched")) + ensure_list(top_result.get("matchReasons")), limit=12)
+    return {
+        "shouldInject": bool(should_inject),
+        "confidence": resolved_confidence,
+        "matchedCaseIds": [item["caseId"] for item in results[:limit]],
+        "whyMatched": why_matched,
+        "riskOfFalsePositive": risk,
+        "retrievalMethod": str(top_result.get("retrievalMethod") or "lexical"),
+        "topScore": top_result["score"],
+    }
 
 
 def collect_scholar_results(
@@ -1154,6 +1287,11 @@ def load_payload(args: argparse.Namespace) -> dict[str, Any]:
     if entry_type == "note" and not ensure_list(payload.get("noteContent")):
         payload["noteContent"] = ensure_list(payload.get("summary"))
 
+    assert_payload_text_integrity(payload)
+
+    if not ensure_bool(payload.get("userConfirmed"), False):
+        raise SystemExit("payload must set userConfirmed=true before archive")
+
     return payload
 
 
@@ -1238,6 +1376,15 @@ def archive_command(args: argparse.Namespace) -> int:
     payload = load_payload(args)
     project_root = Path(args.project_root).resolve()
     scope = payload.get("scopeDecision", "project")
+    runtime_state_path = Path(args.runtime_state_file).resolve() if args.runtime_state_file else None
+    runtime_state: dict[str, Any] | None = None
+    if runtime_state_path is not None:
+        try:
+            runtime_state = load_state(runtime_state_path)
+            assert_can_archive(runtime_state, payload)
+        except RuntimeStateError as exc:
+            raise SystemExit(str(exc)) from exc
+
     result: dict[str, Any] = {
         "host": args.host,
         "scopeDecision": scope,
@@ -1265,6 +1412,17 @@ def archive_command(args: argparse.Namespace) -> int:
             args.stale_days,
             payload.get("globalMemoryMarkdown"),
         )
+
+    if runtime_state_path is not None and runtime_state is not None:
+        archived_state = transition(
+            runtime_state,
+            "archived",
+            archived_entry_type=payload["entryType"],
+            archived_scope=scope,
+            archived_title=payload["title"],
+            archived_at=payload["archivedAt"],
+        )
+        save_state(runtime_state_path, archived_state)
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
@@ -1426,6 +1584,7 @@ def load_pruned_scope_context(
     catalog = load_catalog(catalog_path)
     ranked_results = query_catalog(catalog, query_text, stale_days, store_scope)
     selected_case_ids = [entry["caseId"] for entry in ranked_results[:limit]]
+    evidence_packet = build_evidence_packet(ranked_results, limit=limit)
 
     if mark_retrieval and selected_case_ids:
         catalog, _ = touch_catalog_entries(catalog, set(selected_case_ids), "retrieval", 1, utc_now())
@@ -1448,6 +1607,7 @@ def load_pruned_scope_context(
         "pruned": True,
         "query": query_text,
         "limit": limit,
+        "evidencePacket": evidence_packet,
         "totalEntries": len(catalog),
         "returnedEntries": len(selected_catalog),
         "memoryPath": store["memory_path"],
@@ -1552,12 +1712,14 @@ def query_command(args: argparse.Namespace) -> int:
         )
 
     combined_results.sort(key=lambda item: (item["score"], item["memoryScore"], item["archivedAt"]), reverse=True)
+    evidence_packet = build_evidence_packet(combined_results, limit=args.limit)
     result = {
         "host": args.host,
         "scope": args.scope,
         "query": query_text,
         "limit": args.limit,
         "generatedAt": utc_now(),
+        "evidencePacket": evidence_packet,
         "results": combined_results[: args.limit],
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -1586,6 +1748,9 @@ def scholar_command(args: argparse.Namespace) -> int:
         "reason": "",
         "message": "",
         "matchedCaseIds": [],
+        "whyMatched": [],
+        "riskOfFalsePositive": "none",
+        "evidencePacket": build_evidence_packet([]),
         "results": [],
     }
 
@@ -1608,7 +1773,11 @@ def scholar_command(args: argparse.Namespace) -> int:
         args.stale_days,
     )
     confidence = classify_scholar_confidence(combined_results)
+    evidence_packet = build_evidence_packet(combined_results, confidence, limit=1)
     result["confidence"] = confidence
+    result["riskOfFalsePositive"] = evidence_packet["riskOfFalsePositive"]
+    result["whyMatched"] = evidence_packet["whyMatched"]
+    result["evidencePacket"] = evidence_packet
     result["results"] = combined_results[: args.limit]
 
     if not combined_results:
@@ -1616,7 +1785,7 @@ def scholar_command(args: argparse.Namespace) -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
 
-    if confidence != "high":
+    if not evidence_packet["shouldInject"]:
         result["reason"] = "low_confidence"
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
@@ -1631,7 +1800,8 @@ def scholar_command(args: argparse.Namespace) -> int:
     result["shouldInject"] = True
     result["reason"] = "inject"
     result["message"] = build_scholar_message(top_entry)
-    result["matchedCaseIds"] = [top_result["caseId"]]
+    result["matchedCaseIds"] = evidence_packet["matchedCaseIds"]
+    result["evidencePacket"] = dict(evidence_packet, shouldInject=True)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
@@ -1707,6 +1877,7 @@ def build_parser() -> argparse.ArgumentParser:
     archive.add_argument("--payload-file")
     archive.add_argument("--payload")
     archive.add_argument("--payload-stdin", action="store_true")
+    archive.add_argument("--runtime-state-file")
     archive.set_defaults(func=archive_command)
 
     consolidate = subparsers.add_parser("consolidate", help="Rebuild cache memories from all mistakes and notes.")

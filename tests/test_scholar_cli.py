@@ -26,6 +26,8 @@ class MistakebookCliScholarTests(unittest.TestCase):
         )
 
     def archive_entry(self, project_root: str, payload: dict[str, object], home_dir: str) -> None:
+        payload = dict(payload)
+        payload.setdefault("userConfirmed", True)
         result = self.run_cli(
             "archive",
             "--host",
@@ -93,6 +95,10 @@ class MistakebookCliScholarTests(unittest.TestCase):
             self.assertNotIn("\n", output["message"])
             self.assertEqual(len(output["matchedCaseIds"]), 1)
             self.assertTrue(output["results"])
+            self.assertEqual(output["riskOfFalsePositive"], "low")
+            self.assertTrue(output["whyMatched"])
+            self.assertEqual(output["evidencePacket"]["shouldInject"], output["shouldInject"])
+            self.assertEqual(output["evidencePacket"]["matchedCaseIds"], output["matchedCaseIds"])
 
             catalog_path = Path(project_root) / ".mistakebook" / "state" / "catalog.json"
             catalog = json.loads(catalog_path.read_text(encoding="utf-8"))

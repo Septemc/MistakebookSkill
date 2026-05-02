@@ -30,6 +30,7 @@
   "archivedAt": "2026-04-21T08:00:00Z",
   "title": "没有先读真实文件就修改协议",
   "summary": "修改协议前没有先读真实实现，导致多宿主规则开始漂移。",
+  "userConfirmed": true,
   "severity": "medium",
   "scopeDecision": "both",
   "scopeReasoning": [
@@ -94,6 +95,7 @@
   "entryType": "note",
   "title": "新增记事本时记得同步缓存记忆",
   "summary": "记事本不是错题，但同样要回写项目记忆和全局记忆。",
+  "userConfirmed": true,
   "noteReason": "这是长期有效的实现约束，不应该只停留在聊天里。",
   "noteContent": [
     "记事本记录主动注意事项，不要求它一定是错题"
@@ -115,13 +117,16 @@
 1. `entryType`
 2. `title`
 3. `summary`
-4. `scopeDecision`
-5. `scopeReasoning`
-6. `rules`
-7. `confirmedUnderstanding`
-8. `originalPrompt`
-9. `correctionFeedback`
-10. `finalReply`
+4. `userConfirmed`
+5. `scopeDecision`
+6. `scopeReasoning`
+7. `rules`
+8. `confirmedUnderstanding`
+9. `originalPrompt`
+10. `correctionFeedback`
+11. `finalReply`
+
+如果 archive 命令传入 `--runtime-state-file`，并且 runtime state 里已有 `case_id`，payload 必须提供相同的 `caseId`，否则不得归档。
 
 ### note
 
@@ -130,12 +135,13 @@
 1. `entryType`
 2. `title`
 3. `summary`
-4. `scopeDecision`
-5. `scopeReasoning`
-6. `rules`
-7. `confirmedUnderstanding`
-8. `noteReason`
-9. `noteContent`
+4. `userConfirmed`
+5. `scopeDecision`
+6. `scopeReasoning`
+7. `rules`
+8. `confirmedUnderstanding`
+9. `noteReason`
+10. `noteContent`
 
 ## 单条 Markdown 结构
 
@@ -222,18 +228,19 @@
 4. `relativePath`
 5. `archivedAt`
 6. `scopeDecision`
-7. `summary`
-8. `rules`
-9. `confirmedUnderstanding`
-10. `projectMemoryDelta`
-11. `globalMemoryDelta`
-12. `noteContent`
-13. `noteActionItems`
-14. `retrievalCount`
-15. `lastRetrievedAt`
-16. `hitCount`
-17. `lastHitAt`
-18. `memoryPriority`
+7. `userConfirmed`
+8. `summary`
+9. `rules`
+10. `confirmedUnderstanding`
+11. `projectMemoryDelta`
+12. `globalMemoryDelta`
+13. `noteContent`
+14. `noteActionItems`
+15. `retrievalCount`
+16. `lastRetrievedAt`
+17. `hitCount`
+18. `lastHitAt`
+19. `memoryPriority`
 
 ## 记忆缓存状态
 
@@ -268,11 +275,26 @@
 3. 达到阈值后，保留高命中、高检索、最近仍活跃的内容
 4. 对长期没有命中的条目执行“暂时遗忘”，但不要删除详细条目
 
+## 编码完整性
+
+归档前必须保证 payload 没有在传输层损坏：
+
+1. 不得包含连续四个以上 ASCII 问号。
+2. 不得包含 `U+FFFD` replacement character。
+3. 不得包含私用区字符。
+4. Windows / PowerShell / Codex `shell_command` 场景中，不要直接把中文 payload 写进命令文本；使用 UTF-8 `--payload-file`，或使用 ASCII `\u` 转义 JSON。
+
+CLI 会在写入前拒绝疑似乱码 payload，防止 `PROJECT_MEMORY.md`、`GLOBAL_MEMORY.md`、`failures/` 和 `notes/` 被污染。
+
 ## 推荐 CLI
 
 ```bash
 python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-file payload.json
+python scripts/mistakebook_cli.py query --host codex --project-root . --scope both --text "<当前任务>" --limit 3
+python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"
 python scripts/mistakebook_cli.py touch --host codex --project-root . --scope both --case-id <case-id> --kind hit
 python scripts/mistakebook_cli.py consolidate --host codex --project-root . --scope both
 python scripts/mistakebook_cli.py context --host codex --project-root . --scope both --mark-retrieval
 ```
+
+`query`、`context --query` 和 `scholar` 都会返回 `evidencePacket`。它至少包含 `shouldInject`、`confidence`、`matchedCaseIds`、`whyMatched`、`riskOfFalsePositive` 和 `retrievalMethod`，用于防止低置信误注入。

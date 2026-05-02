@@ -9,7 +9,8 @@ description: "在新任务开始前运行学霸模式预检，只在高置信命
 执行规则：
 
 1. 只有 `shouldInject = true` 时，才在正式回答前输出一行 `message`。
-2. 如果 `shouldInject = false`，保持静默，直接正常回答。
+2. 判断时参考 `evidencePacket.confidence`、`evidencePacket.whyMatched` 和 `evidencePacket.riskOfFalsePositive`。
+3. 如果 `shouldInject = false`，保持静默，直接正常回答。
 3. 如果当前已经进入纠错闭环、记事本归档或 `Ascended Mode`，不要运行 `scholar`。
 4. `scholar` 负责答前避错，不替代 `Ascended Mode` 的失败升级处理。
 5. 需要长期关闭或开启时，分别执行：

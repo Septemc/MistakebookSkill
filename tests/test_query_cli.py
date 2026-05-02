@@ -20,6 +20,8 @@ class MistakebookCliQueryTests(unittest.TestCase):
         )
 
     def archive_entry(self, project_root: str, payload: dict[str, object], global_root: str | None = None) -> dict[str, object]:
+        payload = dict(payload)
+        payload.setdefault("userConfirmed", True)
         args = [
             "archive",
             "--host",
@@ -177,6 +179,70 @@ class MistakebookCliQueryTests(unittest.TestCase):
             project_only_output = json.loads(project_only_result.stdout)
             self.assertTrue(project_only_output["results"])
             self.assertEqual({item["storeScope"] for item in project_only_output["results"]}, {"project"})
+
+    def test_query_returns_evidence_packet_for_ranked_results(self) -> None:
+        with tempfile.TemporaryDirectory() as project_root:
+            self.archive_entry(
+                project_root,
+                {
+                    "entryType": "mistake",
+                    "caseId": "implementation-case",
+                    "title": "read implementation first",
+                    "summary": "read source code before updating docs",
+                    "scopeDecision": "project",
+                    "keywords": ["implementation", "docs"],
+                    "rules": ["read implementation before docs"],
+                    "confirmedUnderstanding": ["source code is the authority"],
+                    "originalPrompt": "update docs",
+                    "correctionFeedback": "you did not inspect implementation",
+                    "finalReply": "checked implementation before editing docs",
+                    "memoryPriority": 3.0,
+                    "retrievalCount": 3,
+                    "hitCount": 2,
+                },
+            )
+            self.archive_entry(
+                project_root,
+                {
+                    "entryType": "note",
+                    "caseId": "cache-case",
+                    "title": "refresh memory cache",
+                    "summary": "refresh memory after archiving entries",
+                    "scopeDecision": "project",
+                    "keywords": ["memory"],
+                    "rules": ["refresh memory after archive"],
+                    "confirmedUnderstanding": ["cache follows archive"],
+                    "noteReason": "long-lived cache rule",
+                    "noteContent": ["refresh memory cache after writes"],
+                },
+            )
+
+            result = self.run_cli(
+                "query",
+                "--host",
+                "codex",
+                "--project-root",
+                project_root,
+                "--text",
+                "read implementation before updating docs",
+                "--limit",
+                "2",
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
+            output = json.loads(result.stdout)
+            packet = output["evidencePacket"]
+            self.assertTrue(packet["shouldInject"])
+            self.assertEqual(packet["confidence"], "high")
+            self.assertEqual(packet["riskOfFalsePositive"], "low")
+            self.assertEqual(packet["matchedCaseIds"][0], "implementation-case")
+            self.assertTrue(packet["whyMatched"])
+
+            top = output["results"][0]
+            self.assertEqual(top["caseId"], "implementation-case")
+            self.assertIn(top["retrievalMethod"], {"sqlite_fts5", "lexical_fallback"})
+            self.assertEqual(top["riskOfFalsePositive"], "low")
+            self.assertIn("exact_keyword:implementation", top["whyMatched"])
 
     def test_query_returns_empty_results_when_nothing_matches(self) -> None:
         with tempfile.TemporaryDirectory() as project_root:

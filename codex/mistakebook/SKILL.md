@@ -96,6 +96,17 @@ description: "识别用户正在纠正你、要求返工、指出你重复犯错
 4. 核对当前仓库里和问题相关的真实文件、真实输出、真实文档
 5. 先解释前几次处理为什么仍然失败，再给出新的最强方案
 
+## 运行态保护
+
+如果当前宿主支持生命周期 hook，运行态优先交给 `scripts/lifecycle_hooks.py`：
+
+1. UserPromptSubmit 用 `scripts/trigger_report.py` 输出 correction / ascended / scholar 的结构化 trigger report
+2. 压缩前用 `pre-compact` 保存 active case 到 `~/.mistakebook/runtime-journal.md`
+3. 压缩后用 `post-compact` 读取 compact summary、刷新 journal，并恢复 `case_id`、`status` 和“不要提前归档”的约束
+4. 会话结束用 `session-end` 保存未完成闭环，`summarizing` 状态必须继续等待用户确认
+5. 子代理启动用 `subagent-start` 注入高置信历史记忆
+6. 子代理结束用 `subagent-stop` 记录实际命中的 case
+
 ## 默认目录
 
 1. 项目级：`<project>/.codex/mistakebook/`
@@ -126,6 +137,16 @@ python scripts/mistakebook_cli.py context --host codex --project-root . --scope 
 
 推荐优先使用 `--payload-stdin`，这样不需要先写临时 JSON 文件。
 
+归档 payload 必须包含 `"userConfirmed": true`。这个字段表示用户已经明确确认当前纠错或记事项可以写入，CLI 会拒绝未确认 payload。
+
+如果归档命令传入 `--runtime-state-file`，只能在 `status=summarizing` 时写入；当 runtime state 里已有 `case_id` 时，payload 必须提供相同的 `caseId`。
+
+编码完整性要求：
+
+1. 不要在 Windows / PowerShell / Codex `shell_command` 里把中文 payload 直接写进命令文本。
+2. 优先用 UTF-8 `--payload-file`，或用 ASCII `\u` 转义 JSON 走 `--payload-stdin`。
+3. CLI 会拒绝连续四个以上问号、`U+FFFD` replacement character、私用区字符；遇到 `payload contains likely encoding corruption` 时，重新生成 payload，不要归档。
+
 ### `mistake` 最小模板
 
 ```json
@@ -133,6 +154,7 @@ python scripts/mistakebook_cli.py context --host codex --project-root . --scope 
   "entryType": "mistake",
   "title": "一句话标题",
   "summary": "一句话总结",
+  "userConfirmed": true,
   "scopeDecision": "project",
   "scopeReasoning": ["为什么归到这个 scope"],
   "rules": ["以后必须遵守什么"],
@@ -150,6 +172,7 @@ python scripts/mistakebook_cli.py context --host codex --project-root . --scope 
   "entryType": "note",
   "title": "一句话标题",
   "summary": "一句话总结",
+  "userConfirmed": true,
   "scopeDecision": "project",
   "scopeReasoning": ["为什么归到这个 scope"],
   "rules": ["以后必须注意什么"],
@@ -167,6 +190,7 @@ cat <<'EOF' | python scripts/mistakebook_cli.py archive --host codex --project-r
   "entryType": "mistake",
   "title": "没有先读真实实现",
   "summary": "修改前没有先核对真实脚本实现。",
+  "userConfirmed": true,
   "scopeDecision": "both",
   "scopeReasoning": ["当前项目里需要复盘", "这个规则跨项目也成立"],
   "rules": ["修改协议前先读真实实现"],
@@ -181,19 +205,8 @@ EOF
 ### PowerShell 示例
 
 ```powershell
-@'
-{
-  "entryType": "note",
-  "title": "新增事项要同步刷新记忆",
-  "summary": "记事本条目归档后要同步更新 memory。",
-  "scopeDecision": "project",
-  "scopeReasoning": ["这是当前项目内的实现约束"],
-  "rules": ["新增 note 后同步刷新 memory"],
-  "confirmedUnderstanding": ["记事本和错题都属于统一记忆体系"],
-  "noteReason": "这是长期有效的实现约束",
-  "noteContent": ["归档 note 后同步刷新项目记忆"]
-}
-'@ | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
+$payload = '{"entryType":"note","title":"\u4e2d\u6587\u8bb0\u4e8b","summary":"\u901a\u8fc7 ASCII Unicode escape \u4f20\u8f93\u4e2d\u6587","userConfirmed":true,"scopeDecision":"project","scopeReasoning":["\u907f\u514d PowerShell \u4f20\u8f93\u5c42\u6539\u5199\u5b57\u7b26"],"rules":["Markdown \u5199\u5165\u5fc5\u987b\u4fdd\u6301 UTF-8"],"confirmedUnderstanding":["\u4e0d\u628a\u5df2\u7ecf\u53d8\u6210\u95ee\u53f7\u7684 payload \u5f52\u6863"],"noteReason":"\u9632\u6b62 PROJECT_MEMORY.md \u4e71\u7801","noteContent":["\u4f7f\u7528 UTF-8 \u6587\u4ef6\u6216 ASCII \\u JSON"]}'
+$payload | python scripts/mistakebook_cli.py archive --host codex --project-root . --payload-stdin
 ```
 
 ## 记忆原则
@@ -207,6 +220,16 @@ EOF
 3. 长期低命中内容暂时退出缓存
 4. 详细条目永远保留在 `failures/` 和 `notes/`
 
+## 行为评测
+
+改动触发词、归档、检索、compact 恢复或宿主入口后，运行：
+
+```bash
+python scripts/eval_harness.py --root .
+```
+
+这会统一验证 trigger recall、trigger precision、archive contract、retrieval quality、compact recovery 和 cross-host matrix。
+
 ## 禁止事项
 
 1. 未经用户确认，禁止归档
@@ -215,15 +238,15 @@ EOF
 4. 不要把暂时遗忘理解成删除详细条目
 ## Scholar Preflight
 
-鍦ㄦ柊鐨勬櫘閫氫换鍔″紑濮嬪墠锛屽鏋滃綋鍓嶄笉鍦ㄧ籂閿欓棴鐜垨 Ascended Mode 閲岋紝鍏堣繍琛岋細
+在新的普通任务开始前，如果当前不在 `mistake` 纠错闭环、`note` 流程或 `Ascended Mode` 里，先运行轻量预检：
 
 ```bash
 python scripts/mistakebook_cli.py scholar --host codex --project-root . --scope both --text "<当前任务>"
 ```
 
-鍙湁褰?`shouldInject = true` 鏃讹紝鎵嶅湪姝ｅ紡鍥炵瓟鍓嶈緭鍑轰竴琛屽巻鍙叉彁閱掋€傚鏋滆繘鍏ョ籂閿欓棴鐜垨 `ascended`锛屽氨鍋滄杩愯 `scholar`锛屼笉瑕佽瀛︿緵妯″紡鍜岄鍗囨ā寮忔姠鍚屼竴涓椂鏈恒€?
+只有当 `scholar` 返回 `shouldInject = true` 时，才在正式回答前输出一行历史提醒；如果返回 `shouldInject = false`，保持静默，不要展示 query 结果。判断时优先看 `evidencePacket` 里的 `confidence`、`whyMatched` 和 `riskOfFalsePositive`。进入纠错闭环、`note` 流程或 `ascended` 后，不要再运行 `scholar`。
 
-濡傛灉鐢ㄦ埛璇?`scholar off` / `scholar on`锛屽彲浠ュ湪褰撳墠浼氳瘽涓存椂鍏抽棴鎴栨仮澶嶉妫€銆傚鏋滅敤鎴疯姹傞暱鏈熷叧闂垨寮€鍚紝鎵ц锛?
+如果用户说 `scholar off` / `scholar on`，可以关闭或恢复预检；长期配置使用：
 
 ```bash
 python scripts/mistakebook_cli.py config --scholar off

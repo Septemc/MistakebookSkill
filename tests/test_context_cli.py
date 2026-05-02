@@ -20,6 +20,8 @@ class MistakebookCliContextTests(unittest.TestCase):
         )
 
     def archive_entry(self, project_root: str, payload: dict[str, object], global_root: str | None = None) -> dict[str, object]:
+        payload = dict(payload)
+        payload.setdefault("userConfirmed", True)
         args = [
             "archive",
             "--host",
@@ -171,6 +173,9 @@ class MistakebookCliContextTests(unittest.TestCase):
             self.assertEqual(project["mistakes"][0]["title"], "先读真实实现")
             self.assertTrue(project["memoryMarkdown"])
             self.assertIn("activeEntries", project["memoryState"])
+            self.assertIn("evidencePacket", project)
+            self.assertEqual(project["evidencePacket"]["matchedCaseIds"][0], project["mistakes"][0]["caseId"])
+            self.assertTrue(project["evidencePacket"]["whyMatched"])
 
     def test_context_query_marks_only_returned_entries(self) -> None:
         with tempfile.TemporaryDirectory() as project_root:
